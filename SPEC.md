@@ -2,7 +2,8 @@
 
 Versión: 0.1 · Estado: borrador, sin código todavía
 Origen: §4.1–4.2 de `tapioca-core/SPEC.md` (`stack.yaml` + `apply`), separado
-como producto propio. Producto: **Pegboard**. Binario: `peg`.
+como producto propio. Producto y binario: **Pegboard** / `pegboard`
+(`peg` ya existe en Homebrew; quien quiera puede usar `alias pb=pegboard`).
 
 ---
 
@@ -10,13 +11,13 @@ como producto propio. Producto: **Pegboard**. Binario: `peg`.
 
 **Configuration as Code para agentes.** Declaras en YAML qué MCPs, skills y
 contexto quieres y en qué agentes (Claude Code, Codex, opencode, Hermes…), y
-`peg` deja cada agente configurado con sus archivos nativos. Piensa en
+`pegboard` deja cada agente configurado con sus archivos nativos. Piensa en
 Ansible (roles redistribuibles, idempotencia) con la disciplina de Terraform
 (`plan`, `apply`, estado, drift, lock).
 
 El problema que resuelve: hoy cada agente guarda MCPs y skills en un lugar y
 formato distinto. Sincronizarlos es traducir a mano o pedirle a un agente que
-lo haga a ciegas, gastando tokens y con riesgo de que quede mal. `peg` hace
+lo haga a ciegas, gastando tokens y con riesgo de que quede mal. `pegboard` hace
 esa traducción con código determinista y probado, y le da a los propios
 agentes una skill para usarlo bien (§7).
 
@@ -31,8 +32,8 @@ está fuera de lugar. Es el producto entero:
 |---|---|
 | Las herramientas | MCPs (literalmente, las tools del agente) y skills |
 | Las siluetas pintadas | `pegboard.yaml`: el estado deseado |
-| Ver qué silueta está vacía | `peg drift` |
-| Regresar cada herramienta a su silueta | `peg apply` |
+| Ver qué silueta está vacía | `pegboard drift` |
+| Regresar cada herramienta a su silueta | `pegboard apply` |
 
 **Icono:** un tablero con agujeritos, una herramienta colgada y una silueta
 vacía al lado. Debe leerse a 16 px.
@@ -49,9 +50,9 @@ vacía al lado. Debe leerse a 16 px.
 ### Principios
 
 1. **Lo determinista es código, no LLM.** Traducir configs es una función con
-   tests por agente. Un agente puede invocar `peg`, nunca improvisar su
+   tests por agente. Un agente puede invocar `pegboard`, nunca improvisar su
    trabajo.
-2. **Nunca pisar lo ajeno.** `peg` solo toca las llaves, archivos y links que
+2. **Nunca pisar lo ajeno.** `pegboard` solo toca las llaves, archivos y links que
    él creó (registrados en el estado). Lo que el usuario escribió a mano se
    respeta.
 3. **Primero mostrar, luego escribir.** Todo cambio pasa por un `plan` legible.
@@ -59,7 +60,7 @@ vacía al lado. Debe leerse a 16 px.
    segunda vez.
 5. **Los secretos nunca viven en el YAML.** Solo referencias.
 6. **La verdad vive en archivos legibles** y versionables en git.
-7. **Pull, no push.** `peg` configura la máquina donde corre. Llevarlo a
+7. **Pull, no push.** `pegboard` configura la máquina donde corre. Llevarlo a
    otras máquinas es trabajo de git, CI, Ansible o un MDM (§8).
 
 ### No-objetivos (por ahora)
@@ -81,7 +82,7 @@ vacía al lado. Debe leerse a 16 px.
 | **Provider** | Adaptador de un agente: sabe leer, mezclar y escribir sus archivos | módulo / provider |
 | **Recurso** | Un MCP, una skill o una regla de contexto | recurso / tarea |
 | **Stack remoto** | Un stack publicado (repo git) que otro incluye con `include` | rol de Galaxy / módulo remoto |
-| **Estado** | Registro de qué escribió `peg` en cada target | `terraform.tfstate` |
+| **Estado** | Registro de qué escribió `pegboard` en cada target | `terraform.tfstate` |
 | **Lock** | Versiones y hashes exactos de lo resuelto | `.terraform.lock.hcl` |
 
 ---
@@ -144,13 +145,13 @@ deja como referencia en lugar de escribir el valor en claro. Si no, avisa en el
 
 Junto a cada `pegboard.yaml`. Fija la versión exacta (commit, tag, hash del
 contenido) de cada skill, de cada stack incluido y, cuando aplica, del paquete
-del MCP (`npx …@x.y.z`). Se versiona en git. `peg apply` usa el lock;
-`peg update` lo refresca.
+del MCP (`npx …@x.y.z`). Se versiona en git. `pegboard apply` usa el lock;
+`pegboard update` lo refresca.
 
 ### 3.4 Estado
 
 `~/.local/state/pegboard/state.json` (global) y `.pegboard/state.json` (proyecto, en
-`.gitignore`). Por target registra qué llaves, archivos y symlinks creó `peg`
+`.gitignore`). Por target registra qué llaves, archivos y symlinks creó `pegboard`
 y su hash. Es lo que permite el principio 2 y detectar drift.
 
 ---
@@ -158,23 +159,23 @@ y su hash. Es lo que permite el principio 2 y detectar drift.
 ## 4. CLI
 
 ```
-peg init                 # crea pegboard.yaml (detecta agentes instalados)
-peg import [--agent X]   # adopta la config existente de los agentes al pegboard.yaml
-peg plan                 # diff de lo que cambiaría; no escribe nada
-peg apply [-y]           # aplica el plan (pide confirmación sin -y)
-peg drift [--exit-code]  # compara estado vs. archivos reales (para CI)
-peg update               # re-resuelve versiones y actualiza pegboard.lock
-peg add mcp|skill …      # edita pegboard.yaml de forma segura (para humanos y agentes)
-peg remove mcp|skill …
-peg agents               # agentes detectados, rutas y versión de provider
-peg skill install        # instala la skill de peg en los agentes (§7)
+pegboard init                     # crea pegboard.yaml (detecta agentes instalados)
+pegboard import [--agent X]       # adopta la config existente de los agentes al pegboard.yaml
+pegboard plan                     # diff de lo que cambiaría; no escribe nada
+pegboard apply [-y]               # aplica el plan (pide confirmación sin -y)
+pegboard drift [--exit-code]      # compara estado vs. archivos reales (para CI)
+pegboard update                   # re-resuelve versiones y actualiza pegboard.lock
+pegboard add mcp|skill …          # edita pegboard.yaml de forma segura (para humanos y agentes)
+pegboard remove mcp|skill …
+pegboard agents                   # agentes detectados, rutas y versión de provider
+pegboard skill install            # instala la skill de pegboard en los agentes (§7)
 ```
 
 Banderas comunes: `--scope global|project`, `--agent <id>` (repetible),
 `--json` (salida estable para agentes y scripts), `--dir <ruta>`.
 
 `plan` muestra, por target, cada recurso como `+` crear, `~` modificar,
-`-` quitar o `!` conflicto (alguien editó a mano algo que `peg` maneja). Un
+`-` quitar o `!` conflicto (alguien editó a mano algo que `pegboard` maneja). Un
 conflicto detiene el `apply` salvo `--force` o resolución explícita.
 
 Códigos de salida: `0` sin cambios, `2` hay cambios/drift (con
@@ -233,7 +234,7 @@ garantiza que es la misma en todos lados.
 ## 6. Ejemplo de `plan`
 
 ```
-$ peg plan
+$ pegboard plan
 claude-code · project
   + mcp github           (.mcp.json)
   + skill mattpocock/tdd (.claude/skills/tdd → cache@a1b2c3)
@@ -249,13 +250,13 @@ Plan: 3 crear, 1 modificar, 0 quitar, 1 conflicto.
 
 ## 7. Skill para agentes
 
-`peg` trae su propia skill (`SKILL.md`), instalable con `peg skill install`
+`pegboard` trae su propia skill (`SKILL.md`), instalable con `pegboard skill install`
 (o declarándola en el stack como cualquier otra). Le enseña al agente a:
 
-1. Nunca editar `.mcp.json`, `config.toml`, etc. a mano: usar `peg add` /
-   `peg remove` sobre el `pegboard.yaml`.
-2. Siempre correr `peg plan --json`, mostrar el resumen al usuario y solo
-   después `peg apply -y`.
+1. Nunca editar `.mcp.json`, `config.toml`, etc. a mano: usar `pegboard add` /
+   `pegboard remove` sobre el `pegboard.yaml`.
+2. Siempre correr `pegboard plan --json`, mostrar el resumen al usuario y solo
+   después `pegboard apply -y`.
 3. Ante un conflicto (`!`), preguntar al usuario en lugar de forzar.
 4. Nunca escribir secretos en claro: proponer una referencia `${env:…}`.
 
@@ -263,27 +264,27 @@ Con esto, "agrégame el MCP de Linear en todos mis agentes" cuesta un par de
 tool calls deterministas en lugar de que el agente lea y reescriba cuatro
 formatos distintos.
 
-Opcional (fase 4): `peg mcp`, un servidor MCP con tools `plan`, `apply`,
+Opcional (fase 4): `pegboard mcp`, un servidor MCP con tools `plan`, `apply`,
 `add`, `drift` para agentes que prefieran tools a shell.
 
 ---
 
 ## 8. Equipos (pull)
 
-`peg` no empuja nada a otras máquinas. En un equipo:
+`pegboard` no empuja nada a otras máquinas. En un equipo:
 
 1. **Stack en el repo del proyecto.** `pegboard.yaml` + `pegboard.lock` versionados;
-   cada dev clona y corre `peg apply`. Como `package.json` + `npm install`.
+   cada dev clona y corre `pegboard apply`. Como `package.json` + `npm install`.
 2. **Stack de la organización como stack remoto.** El global de cada dev hace
    `include: github.com/empresa/agent-stack?ref=v3`. Cambiar de versión es
    decisión de cada quien, viendo el `plan`.
 3. **Políticas como validación.** Un stack puede declarar
    `policy: { allow_mcps: [github, linear] }`; `plan`/`apply` fallan si el
-   resultado incluye algo fuera de la lista. En CI, `peg drift --exit-code`
-   y `peg plan --exit-code` revisan que el repo cumpla.
+   resultado incluye algo fuera de la lista. En CI, `pegboard drift --exit-code`
+   y `pegboard plan --exit-code` revisan que el repo cumpla.
 4. **Flotas.** Si una empresa quiere forzarlo en todas las laptops, usa
    Ansible, un MDM o los *managed settings* de cada harness para correr
-   `peg apply`. `peg` es el módulo; ellos, el transporte.
+   `pegboard apply`. `pegboard` es el módulo; ellos, el transporte.
 
 ---
 
@@ -295,7 +296,7 @@ Opcional (fase 4): `peg mcp`, un servidor MCP con tools `plan`, `apply`,
   `santhosh-tekuri/jsonschema`, Bubble Tea / Lip Gloss (TUI, fase 4).
 - **Layout:**
   ```
-  cmd/peg/            # entrada CLI
+  cmd/pegboard/        # entrada CLI
   internal/stack/      # parseo, schema, mezcla, includes
   internal/resolve/    # skills/stacks remotos, caché, lock
   internal/secrets/    # resolución de ${…}
@@ -310,7 +311,7 @@ Opcional (fase 4): `peg mcp`, un servidor MCP con tools `plan`, `apply`,
   de un `t.TempDir()`.
 - **Distribución:** GitHub Releases con goreleaser, Homebrew tap, `go install`.
 - **Tapioca** lo consume como binario: sus tools `apply_stack` y
-  `check_drift` se vuelven llamadas a `peg --json`.
+  `check_drift` se vuelven llamadas a `pegboard --json`.
 
 ---
 
@@ -319,10 +320,10 @@ Opcional (fase 4): `peg mcp`, un servidor MCP con tools `plan`, `apply`,
 Cada fase termina cuando la uso a diario sin frustración.
 
 ### Fase 0 — Esqueleto
-- Repo Go, CI (lint + tests), `peg agents` detectando Claude Code, Codex,
+- Repo Go, CI (lint + tests), `pegboard agents` detectando Claude Code, Codex,
   opencode y Hermes.
 - JSON Schema de `pegboard.yaml`.
-- **Listo cuando:** `peg agents` lista bien lo instalado en mi máquina.
+- **Listo cuando:** `pegboard agents` lista bien lo instalado en mi máquina.
 
 ### Fase 1 — MCPs local
 - `init`, `plan`, `apply`, `drift` para MCPs en los 4 providers, alcances
@@ -333,20 +334,20 @@ Cada fase termina cuando la uso a diario sin frustración.
 ### Fase 2 — Skills y skill propia
 - Skills locales y de git con caché, symlinks y `pegboard.lock`; `update`.
 - `context.agents_md`.
-- `add` / `remove`, `--json` estable, `peg skill install`.
+- `add` / `remove`, `--json` estable, `pegboard skill install`.
 - **Listo cuando:** le pido a un agente "agrega X a todos" y lo hace con
-  `peg` sin equivocarse.
+  `pegboard` sin equivocarse.
 
 ### Fase 3 — Stacks remotos y políticas
 - `include` de stacks en git con lock; `policy.allow_mcps`.
 - Secretos `op://` y `keychain:`.
 - `--exit-code` para CI y un ejemplo de GitHub Action.
 - **Listo cuando:** comparto un stack en un repo y otra máquina queda igual
-  con un `peg apply`.
+  con un `pegboard apply`.
 
 ### Fase 4 — TUI y extras
 - TUI (Bubble Tea): ver targets, revisar el plan, aplicar.
-- `peg mcp` (servidor MCP propio).
+- `pegboard mcp` (servidor MCP propio).
 - Más providers según uso.
 
 ### Después (sin compromiso)
@@ -358,7 +359,7 @@ Cada fase termina cuando la uso a diario sin frustración.
 ## 11. Riesgos
 
 - **Los agentes cambian rutas y formatos seguido.** Mitigación: providers
-  versionados, `peg agents` muestra la versión detectada del harness, y
+  versionados, `pegboard agents` muestra la versión detectada del harness, y
   golden tests con configs reales que se actualizan al detectar cambios.
 - **Preservar comentarios y formato** en JSON/TOML/YAML es difícil; si no se
   puede, el `plan` lo avisa antes de escribir.
