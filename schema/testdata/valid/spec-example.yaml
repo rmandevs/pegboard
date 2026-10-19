@@ -1,0 +1,28 @@
+# Ejemplo de SPEC §3.1.
+version: 1
+agents: [claude-code, codex, opencode, hermes]
+inherit: global
+
+include:
+  - github.com/rmandevs/stacks//web?ref=v1
+
+mcps:
+  github:
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-github"]
+    env:
+      GITHUB_TOKEN: "${env:GITHUB_TOKEN}"
+  notion:
+    url: https://mcp.notion.com/mcp
+    agents: [claude-code]
+
+skills:
+  - mattpocock/tdd
+  - github.com/anthropics/skills//pdf?ref=main
+  - ./skills/mi-skill
+
+context:
+  agents_md: true
+
+remove:
+  mcps: [notion]

@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmandevs/agents-casc/main/schema/pegboard.schema.json",
+  "title": "pegboard.yaml",
+  "description": "Estado deseado de MCPs, skills y contexto para agentes (SPEC §3.1).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version"],
+  "properties": {
+    "version": {
+      "description": "Versión del formato.",
+      "const": 1
+    },
+    "agents": {
+      "description": "Targets a configurar. Default: los agentes detectados.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/agentRef" },
+      "uniqueItems": true
+    },
+    "inherit": {
+      "description": "Solo en stacks de proyecto: heredar el stack global o no.",
+      "enum": ["global", "none"]
+    },
+    "include": {
+      "description": "Stacks remotos que se mezclan en orden, antes de este archivo.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "mcps": {
+      "description": "Servidores MCP por nombre.",
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/name" },
+      "additionalProperties": { "$ref": "#/$defs/mcp" }
+    },
+    "skills": {
+      "description": "Skills: owner/nombre, URL de git (host/repo//ruta?ref=x) o ruta local (./…).",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "agents_md": {
+          "description": "Garantiza AGENTS.md y el puente @AGENTS.md en CLAUDE.md.",
+          "type": "boolean"
+        }
+      }
+    },
+    "remove": {
+      "description": "Quita recursos heredados o incluidos; se aplica al final de la mezcla.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mcps": { "type": "array", "items": { "$ref": "#/$defs/name" }, "uniqueItems": true },
+        "skills": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true }
+      }
+    },
+    "policy": {
+      "description": "Validaciones que plan/apply hacen sobre el resultado de la mezcla (SPEC §8).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow_mcps": { "type": "array", "items": { "$ref": "#/$defs/name" }, "uniqueItems": true }
+      }
+    }
+  },
+  "$defs": {
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+    },
+    "agentRef": {
+      "description": "ID de agente, opcionalmente con perfil: hermes:trabajo.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*(:[A-Za-z0-9][A-Za-z0-9_.-]*)?$"
+    },
+    "mcp": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "command": { "type": "string", "minLength": 1 },
+        "args": { "type": "array", "items": { "type": "string" } },
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "url": { "type": "string", "pattern": "^https?://" },
+        "headers": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "agents": {
+          "description": "Restringe el MCP a estos agentes.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/agentRef" },
+          "uniqueItems": true
+        }
+      },
+      "oneOf": [
+        {
+          "title": "stdio",
+          "required": ["command"],
+          "not": { "anyOf": [{ "required": ["url"] }, { "required": ["headers"] }] }
+        },
+        {
+          "title": "http",
+          "required": ["url"],
+          "not": { "anyOf": [{ "required": ["command"] }, { "required": ["args"] }, { "required": ["env"] }] }
+        }
+      ]
+    }
+  }
+}

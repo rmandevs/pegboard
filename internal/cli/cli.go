@@ -1,0 +1,80 @@
+// Package cli arma los comandos de pegboard (SPEC §4).
+package cli
+
+import (
+	"errors"
+	"fmt"
+	"io"
+
+	"github.com/spf13/cobra"
+
+	"github.com/rmandevs/agents-casc/internal/agent"
+	"github.com/rmandevs/agents-casc/providers"
+)
+
+// Version se fija al compilar con -ldflags "-X …/internal/cli.Version=x.y.z".
+var Version = "dev"
+
+// EnvFunc construye el entorno para la carpeta de --dir.
+type EnvFunc func(dir string) (agent.Env, error)
+
+type options struct {
+	scope  string
+	agents []string
+	json   bool
+	dir    string
+}
+
+// Run ejecuta pegboard con args y devuelve el código de salida.
+func Run(args []string, stdout, stderr io.Writer, newEnv EnvFunc) int {
+	root := newRoot(stdout, stderr, newEnv)
+	root.SetArgs(args)
+	if err := root.Execute(); err != nil {
+		fmt.Fprintln(stderr, "error:", err)
+		return 1
+	}
+	return 0
+}
+
+func newRoot(stdout, stderr io.Writer, newEnv EnvFunc) *cobra.Command {
+	opts := &options{}
+	root := &cobra.Command{
+		Use:           "pegboard",
+		Short:         "Configuration as Code para agentes",
+		Version:       Version,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+	}
+	root.SetOut(stdout)
+	root.SetErr(stderr)
+	f := root.PersistentFlags()
+	f.StringVar(&opts.scope, "scope", "", "alcance: global o project (default: ambos)")
+	f.StringArrayVar(&opts.agents, "agent", nil, "limitar a un agente (repetible)")
+	f.BoolVar(&opts.json, "json", false, "salida JSON estable")
+	f.StringVar(&opts.dir, "dir", ".", "carpeta del proyecto")
+
+	root.AddCommand(newAgentsCmd(opts, newEnv))
+	return root
+}
+
+// selection resuelve --scope y --agent.
+func (o *options) selection() ([]agent.Scope, []agent.Provider, error) {
+	scopes, ok := agent.ParseScope(o.scope)
+	if !ok {
+		return nil, nil, fmt.Errorf("--scope %q inválido: usa global o project", o.scope)
+	}
+	if len(o.agents) == 0 {
+		return scopes, providers.All(), nil
+	}
+	var provs []agent.Provider
+	var errs []error
+	for _, id := range o.agents {
+		p, ok := providers.Get(id)
+		if !ok {
+			errs = append(errs, fmt.Errorf("agente desconocido %q", id))
+			continue
+		}
+		provs = append(provs, p)
+	}
+	return scopes, provs, errors.Join(errs...)
+}

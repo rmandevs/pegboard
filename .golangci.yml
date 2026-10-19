@@ -1,0 +1,27 @@
+version: "2"
+linters:
+  enable:
+    - errorlint
+    - revive
+    - unconvert
+    - unparam
+  settings:
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
+  exclusions:
+    rules:
+      # Escribir a stdout/stderr de la CLI no tiene un error útil que manejar.
+      - linters: [errcheck]
+        text: "fmt.Fprint"
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/rmandevs/agents-casc

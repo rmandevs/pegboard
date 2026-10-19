@@ -1,0 +1,4 @@
+version: 1
+mcps:
+  github:
+    args: ["-y", "x"]

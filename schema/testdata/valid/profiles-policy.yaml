@@ -1,0 +1,9 @@
+version: 1
+agents: [hermes:trabajo, claude-code]
+mcps:
+  linear:
+    url: https://mcp.linear.app/mcp
+    headers:
+      Authorization: "Bearer ${env:LINEAR_TOKEN}"
+policy:
+  allow_mcps: [linear, github]

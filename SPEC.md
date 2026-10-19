@@ -1,6 +1,6 @@
 # Pegboard — SPEC
 
-Versión: 0.1 · Estado: borrador, sin código todavía
+Versión: 0.1 · Estado: fase 0 implementada (esqueleto + `pegboard agents`)
 Origen: §4.1–4.2 de `tapioca-core/SPEC.md` (`stack.yaml` + `apply`), separado
 como producto propio. Producto y binario: **Pegboard** / `pegboard`
 (`peg` ya existe en Homebrew; quien quiera puede usar `alias pb=pegboard`).
@@ -227,12 +227,22 @@ Cada provider implementa la misma interfaz:
 ```go
 type Provider interface {
     ID() string
-    Detect(scope Scope) (Target, bool)          // ¿está instalado / aplica aquí?
+    Version() int                               // versión del provider, no del agente
+    Detect(env Env, scope Scope) []Target       // ¿está instalado / aplica aquí? (varios: perfiles)
     Read(t Target) (Observed, error)            // config actual, incluida la ajena
     Plan(t Target, desired Desired, st State) (Changes, error)
     Apply(t Target, c Changes) (State, error)   // escritura atómica + backup
 }
 ```
+
+`Env` reúne todo lo que el provider consulta de la máquina (home, carpeta del
+proyecto, variables, `PATH`, `--version`), para que los tests corran sobre un
+`t.TempDir()`. La fase 0 implementa `ID`, `Version` y `Detect`; `Read`, `Plan`
+y `Apply` llegan con la fase 1.
+
+Un agente se da por instalado si su binario está en el `PATH` o existe su
+carpeta de configuración de usuario. En alcance `project` aplica siempre que
+esté instalado, haya o no archivos en la carpeta todavía.
 
 Requisitos de cada provider: tests de ida y vuelta (leer → escribir → leer da
 lo mismo), preservar formato y comentarios cuando el formato lo permita (TOML,
@@ -244,12 +254,16 @@ YAML, JSONC) y escribir de forma atómica con respaldo en
 Rutas a verificar al implementar cada provider; esta tabla es punto de
 partida, no verdad.
 
-| Agente | MCPs (global / proyecto) | Skills (global / proyecto) | Contexto |
-|---|---|---|---|
-| Claude Code | `~/.claude.json` / `.mcp.json` | `~/.claude/skills/` / `.claude/skills/` | `CLAUDE.md` con `@AGENTS.md` |
-| Codex | `~/.codex/config.toml` (`[mcp_servers.*]`) / `.codex/config.toml` | por verificar / `.agents/skills/` | `AGENTS.md` nativo |
-| opencode | `~/.config/opencode/opencode.json` / `opencode.json` (`mcp`) | por verificar | `AGENTS.md` nativo |
-| Hermes | `~/.hermes/config.yaml` (`mcp_servers`) | `~/.hermes/skills/` por verificar; perfiles en `~/.hermes/profiles/<p>/` | `SOUL.md` / por verificar |
+| Agente | Binario · carpeta (variable) | MCPs (global / proyecto) | Skills (global / proyecto) | Contexto |
+|---|---|---|---|---|
+| Claude Code | `claude` · `~/.claude` (`CLAUDE_CONFIG_DIR`) | `~/.claude.json` / `.mcp.json` | `~/.claude/skills/` / `.claude/skills/` | `CLAUDE.md` con `@AGENTS.md` |
+| Codex | `codex` · `~/.codex` (`CODEX_HOME`) | `~/.codex/config.toml` (`[mcp_servers.*]`) / `.codex/config.toml` | `~/.agents/skills/` / `.agents/skills/` | `AGENTS.md` nativo |
+| opencode | `opencode` · `~/.config/opencode` (`XDG_CONFIG_HOME`) | `~/.config/opencode/opencode.json` / `opencode.json` (`mcp`) | `~/.config/opencode/skills/` / `.opencode/skills/` | `AGENTS.md` nativo |
+| Hermes | `hermes` · `~/.hermes` (`HERMES_HOME`) | `~/.hermes/config.yaml` (`mcp_servers`) | `~/.hermes/skills/`; perfiles en `~/.hermes/profiles/<p>/` | `SOUL.md` |
+
+Por verificar contra cada agente al implementar su `Read`/`Apply` (fase 1):
+skills globales de Codex y opencode, `opencode.jsonc` como alternativa a
+`opencode.json`, y que `CLAUDE_CONFIG_DIR` mueva también `.claude.json`.
 
 Hermes no tiene alcance de proyecto conocido: solo `global` (y por perfil,
 como sub-target `hermes:<perfil>`).
@@ -357,7 +371,7 @@ Opcional (fase 4): `pegboard mcp`, un servidor MCP con tools `plan`, `apply`,
 
 Cada fase termina cuando la uso a diario sin frustración.
 
-### Fase 0 — Esqueleto
+### Fase 0 — Esqueleto ✅
 - Repo Go, CI (lint + tests), `pegboard agents` detectando Claude Code, Codex,
   opencode y Hermes.
 - JSON Schema de `pegboard.yaml`.

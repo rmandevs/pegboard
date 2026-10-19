@@ -1,0 +1,6 @@
+version: 1
+mcps:
+  notion:
+    url: https://mcp.notion.com/mcp
+    env:
+      TOKEN: x
