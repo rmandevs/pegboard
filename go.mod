@@ -3,6 +3,7 @@ module github.com/rmandevs/agents-casc
 go 1.24
 
 require (
+	github.com/pelletier/go-toml/v2 v2.4.3
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/spf13/cobra v1.10.2
 	gopkg.in/yaml.v3 v3.0.1

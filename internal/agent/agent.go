@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // Scope es el alcance de un stack: el usuario (global) o una carpeta (project).
@@ -79,6 +80,8 @@ type Env struct {
 	LookPath   func(string) (string, error)
 	// BinVersion devuelve la versión de un binario, o "" si no se sabe.
 	BinVersion func(path string) string
+	LookupEnv  func(string) (string, bool)
+	Now        func() time.Time
 }
 
 // DefaultEnv es el entorno real del proceso.
@@ -97,6 +100,8 @@ func DefaultEnv(projectDir string) (Env, error) {
 		Getenv:     os.Getenv,
 		LookPath:   lookPath,
 		BinVersion: memo(binVersion),
+		LookupEnv:  os.LookupEnv,
+		Now:        time.Now,
 	}, nil
 }
 
@@ -133,17 +138,19 @@ func (e Env) XDGConfig() string {
 }
 
 // Pretty abrevia una ruta para mostrarla: relativa al proyecto o con ~.
+// Las abreviadas usan / en todos los sistemas, para que la salida sea la
+// misma en Windows.
 func (e Env) Pretty(p string) string {
 	if p == "" {
 		return ""
 	}
 	if e.ProjectDir != "" {
 		if rel, ok := under(e.ProjectDir, p); ok {
-			return rel
+			return filepath.ToSlash(rel)
 		}
 	}
 	if rel, ok := under(e.Home, p); ok {
-		return filepath.Join("~", rel)
+		return "~/" + filepath.ToSlash(rel)
 	}
 	return p
 }
@@ -190,4 +197,15 @@ func (e Env) Present(paths ...string) []string {
 		}
 	}
 	return out
+}
+
+// StateDir es $XDG_STATE_HOME/pegboard (~/.local/state/pegboard): estado
+// global y backups.
+func (e Env) StateDir() string {
+	return filepath.Join(e.EnvDir("XDG_STATE_HOME", filepath.Join(".local", "state")), "pegboard")
+}
+
+// ConfigDir es $XDG_CONFIG_HOME/pegboard: donde vive el pegboard.yaml global.
+func (e Env) ConfigDir() string {
+	return filepath.Join(e.XDGConfig(), "pegboard")
 }

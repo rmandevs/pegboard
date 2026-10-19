@@ -25,18 +25,29 @@ type options struct {
 	dir    string
 }
 
-// Run ejecuta pegboard con args y devuelve el código de salida.
-func Run(args []string, stdout, stderr io.Writer, newEnv EnvFunc) int {
-	root := newRoot(stdout, stderr, newEnv)
+// exitCode termina con un código sin mensaje de error (p. ej. 2 = hay
+// cambios con --exit-code).
+type exitCode int
+
+func (e exitCode) Error() string { return fmt.Sprintf("código de salida %d", int(e)) }
+
+// Run ejecuta pegboard con args y devuelve el código de salida: 0 sin
+// cambios, 2 hay cambios o drift (con --exit-code), 1 error.
+func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, newEnv EnvFunc) int {
+	root := newRoot(stdin, stdout, stderr, newEnv)
 	root.SetArgs(args)
 	if err := root.Execute(); err != nil {
+		var code exitCode
+		if errors.As(err, &code) {
+			return int(code)
+		}
 		fmt.Fprintln(stderr, "error:", err)
 		return 1
 	}
 	return 0
 }
 
-func newRoot(stdout, stderr io.Writer, newEnv EnvFunc) *cobra.Command {
+func newRoot(stdin io.Reader, stdout, stderr io.Writer, newEnv EnvFunc) *cobra.Command {
 	opts := &options{}
 	root := &cobra.Command{
 		Use:           "pegboard",
@@ -45,6 +56,7 @@ func newRoot(stdout, stderr io.Writer, newEnv EnvFunc) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
+	root.SetIn(stdin)
 	root.SetOut(stdout)
 	root.SetErr(stderr)
 	f := root.PersistentFlags()
@@ -53,7 +65,16 @@ func newRoot(stdout, stderr io.Writer, newEnv EnvFunc) *cobra.Command {
 	f.BoolVar(&opts.json, "json", false, "salida JSON estable")
 	f.StringVar(&opts.dir, "dir", ".", "carpeta del proyecto")
 
-	root.AddCommand(newAgentsCmd(opts, newEnv))
+	root.AddCommand(
+		newAgentsCmd(opts, newEnv),
+		newInitCmd(opts, newEnv),
+		newPlanCmd(opts, newEnv),
+		newApplyCmd(opts, newEnv),
+		newDriftCmd(opts, newEnv),
+		newImportCmd(opts, newEnv),
+		newInstallCmd(opts, newEnv),
+		newUninstallCmd(opts, newEnv),
+	)
 	return root
 }
 

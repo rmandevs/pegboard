@@ -3,16 +3,18 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/rmandevs/agents-casc/internal/agent/agenttest"
 )
 
+// stdin es lo que lee la confirmación de apply; los tests lo cambian.
+var stdin = ""
+
 func run(m *agenttest.Machine, args ...string) (string, string, int) {
 	var out, errb bytes.Buffer
-	code := Run(args, &out, &errb, m.EnvFunc())
+	code := Run(args, strings.NewReader(stdin), &out, &errb, m.EnvFunc())
 	return out.String(), errb.String(), code
 }
 
@@ -53,7 +55,7 @@ func TestAgentsText(t *testing.T) {
 		"claude-code · project",
 		"mcps:       .mcp.json\n",
 	} {
-		if want = filepath.FromSlash(want); !strings.Contains(out, want) {
+		if !strings.Contains(out, want) {
 			t.Errorf("falta %q en:\n%s", want, out)
 		}
 	}

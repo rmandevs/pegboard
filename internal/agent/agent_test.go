@@ -33,16 +33,16 @@ func TestParseScope(t *testing.T) {
 }
 
 func TestPretty(t *testing.T) {
-	env := Env{Home: "/h", ProjectDir: "/h/proj"}
+	env := Env{Home: filepath.FromSlash("/h"), ProjectDir: filepath.FromSlash("/h/proj")}
 	cases := map[string]string{
 		"/h/proj/.mcp.json": ".mcp.json",
-		"/h/.claude.json":   filepath.Join("~", ".claude.json"),
-		"/h/projx/a":        filepath.Join("~", "projx/a"),
-		"/etc/x":            "/etc/x",
+		"/h/.claude.json":   "~/.claude.json",
+		"/h/projx/a":        "~/projx/a",
+		"/etc/x":            filepath.FromSlash("/etc/x"),
 		"":                  "",
 	}
 	for in, want := range cases {
-		if got := env.Pretty(in); got != want {
+		if got := env.Pretty(filepath.FromSlash(in)); got != want {
 			t.Errorf("Pretty(%q) = %q, want %q", in, got, want)
 		}
 	}

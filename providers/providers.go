@@ -53,3 +53,11 @@ func Detect(env agent.Env, provs []agent.Provider, scopes []agent.Scope) []agent
 	}
 	return out
 }
+
+// Compile-time: los cuatro providers manejan MCPs.
+var (
+	_ agent.MCPProvider = claudecode.Provider{}
+	_ agent.MCPProvider = codex.Provider{}
+	_ agent.MCPProvider = opencode.Provider{}
+	_ agent.MCPProvider = hermes.Provider{}
+)

@@ -1,6 +1,6 @@
 # Pegboard — SPEC
 
-Versión: 0.1 · Estado: fase 0 implementada (esqueleto + `pegboard agents`)
+Versión: 0.1 · Estado: fases 0 y 1 implementadas (MCPs: plan / apply / drift / import / install)
 Origen: §4.1–4.2 de `tapioca-core/SPEC.md` (`stack.yaml` + `apply`), separado
 como producto propio. Producto y binario: **Pegboard** / `pegboard`
 (`peg` ya existe en Homebrew; quien quiera puede usar `alias pb=pegboard`).
@@ -127,6 +127,13 @@ remove:                                          # quitar algo heredado o inclui
 Reglas de mezcla: `global` → `include` (en orden) → proyecto. Lo posterior
 gana por llave; `remove` se aplica al final.
 
+En la fase 1 cada alcance aplica su propio stack a sus propios targets: el
+global a `~/.claude.json`, `~/.codex/config.toml`…; el de proyecto a
+`.mcp.json`, `.codex/config.toml`… Los agentes ya leen la config global
+además de la del proyecto, así que copiar lo global en cada proyecto sería
+duplicarlo. Sin `--scope`, `plan`/`apply` trabajan sobre los alcances que
+tienen `pegboard.yaml`; `inherit: none` en el proyecto excluye el global.
+
 ### 3.2 Secretos
 
 Valores con `${…}` se resuelven al aplicar y **nunca** se escriben en el
@@ -140,6 +147,18 @@ estado ni en el lock:
 Si el agente destino admite referencias a env de forma nativa, el provider las
 deja como referencia en lugar de escribir el valor en claro. Si no, avisa en el
 `plan` que el secreto quedará en texto plano en ese archivo.
+
+| Agente | `${env:X}` | `${file:…}` |
+|---|---|---|
+| Claude Code | `${X}` (lo expande Claude Code) | en claro |
+| Codex | `env_vars = ["X"]` si la llave es `X`; `Authorization: Bearer ${env:X}` → `bearer_token_env_var`; header `${env:X}` → `env_http_headers`; lo demás en claro | en claro |
+| opencode | `{env:X}` | `{file:/ruta/absoluta}` |
+| Hermes | en claro | en claro |
+
+El estado guarda un hash de cada entrada con los valores en claro
+enmascarados: detecta ediciones a mano sin depender del secreto. Como el
+`plan` compara lo que hay en el archivo con lo recién resuelto, rotar un
+secreto en claro se ve como `~ modificar`.
 
 ### 3.3 `pegboard.lock`
 
@@ -177,8 +196,11 @@ Banderas comunes: `--scope global|project`, `--agent <id>` (repetible),
 `--json` (salida estable para agentes y scripts), `--dir <ruta>`.
 
 `plan` muestra, por target, cada recurso como `+` crear, `~` modificar,
-`-` quitar o `!` conflicto (alguien editó a mano algo que `pegboard` maneja). Un
-conflicto detiene el `apply` salvo `--force` o resolución explícita.
+`-` quitar, `=` adoptar (ya estaba exactamente así; solo se registra) o `!`
+conflicto. Hay conflicto cuando alguien editó a mano algo que `pegboard`
+maneja, cuando ya existe una entrada con ese nombre que `pegboard` no creó, o
+cuando está escrita de una forma que no sabe editar sin riesgo (p. ej. una
+tabla en línea en TOML). Un conflicto detiene el `apply` salvo `--force`.
 
 Códigos de salida: `0` sin cambios, `2` hay cambios/drift (con
 `--exit-code`), `1` error.
@@ -229,16 +251,32 @@ type Provider interface {
     ID() string
     Version() int                               // versión del provider, no del agente
     Detect(env Env, scope Scope) []Target       // ¿está instalado / aplica aquí? (varios: perfiles)
-    Read(t Target) (Observed, error)            // config actual, incluida la ajena
-    Plan(t Target, desired Desired, st State) (Changes, error)
-    Apply(t Target, c Changes) (State, error)   // escritura atómica + backup
+}
+
+type MCPProvider interface {
+    Provider
+    MCPFile(t Target) native.File               // archivo, formato y llave contenedora
+    EncodeMCP(m mcp.MCP, enc *Encoder) (*native.Obj, error) // a formato nativo
+    DecodeMCP(v any) (mcp.MCP, error)           // de formato nativo (para import)
 }
 ```
 
 `Env` reúne todo lo que el provider consulta de la máquina (home, carpeta del
 proyecto, variables, `PATH`, `--version`), para que los tests corran sobre un
-`t.TempDir()`. La fase 0 implementa `ID`, `Version` y `Detect`; `Read`, `Plan`
-y `Apply` llegan con la fase 1.
+`t.TempDir()`.
+
+Leer, mezclar, planear y escribir no se repite por agente: lo hace
+`internal/engine` sobre los editores de `internal/native`. Un provider solo
+dice dónde viven sus MCPs y cómo se traducen. Los editores solo reescriben la
+llave contenedora (`mcpServers`, `mcp`, `mcp_servers`):
+
+- **JSON:** reemplaza los bytes del valor contenedor; el resto del archivo
+  (p. ej. todo lo demás de `~/.claude.json`) queda byte a byte.
+- **TOML:** cada MCP es una sección `[mcp_servers.<nombre>]`; se reemplaza la
+  sección en su lugar y los comentarios quedan. Un MCP escrito como tabla en
+  línea es conflicto.
+- **YAML:** árbol de nodos de `yaml.v3`; conserva comentarios pero normaliza la
+  indentación a 2 espacios.
 
 Un agente se da por instalado si su binario está en el `PATH` o existe su
 carpeta de configuración de usuario. En alcance `project` aplica siempre que
@@ -261,9 +299,11 @@ partida, no verdad.
 | opencode | `opencode` · `~/.config/opencode` (`XDG_CONFIG_HOME`) | `~/.config/opencode/opencode.json` / `opencode.json` (`mcp`) | `~/.config/opencode/skills/` / `.opencode/skills/` | `AGENTS.md` nativo |
 | Hermes | `hermes` · `~/.hermes` (`HERMES_HOME`) | `~/.hermes/config.yaml` (`mcp_servers`) | `~/.hermes/skills/`; perfiles en `~/.hermes/profiles/<p>/` | `SOUL.md` |
 
-Por verificar contra cada agente al implementar su `Read`/`Apply` (fase 1):
-skills globales de Codex y opencode, `opencode.jsonc` como alternativa a
-`opencode.json`, y que `CLAUDE_CONFIG_DIR` mueva también `.claude.json`.
+Por verificar contra cada agente real: skills globales de Codex y opencode;
+`opencode.jsonc` (hoy solo se escribe `opencode.json`); que `CLAUDE_CONFIG_DIR`
+mueva también `.claude.json`; las llaves `env_vars`, `bearer_token_env_var` y
+`env_http_headers` de Codex; y si Hermes interpola variables en `config.yaml`
+(hoy se asume que no).
 
 Hermes no tiene alcance de proyecto conocido: solo `global` (y por perfil,
 como sub-target `hermes:<perfil>`).
@@ -377,7 +417,7 @@ Cada fase termina cuando la uso a diario sin frustración.
 - JSON Schema de `pegboard.yaml`.
 - **Listo cuando:** `pegboard agents` lista bien lo instalado en mi máquina.
 
-### Fase 1 — MCPs local
+### Fase 1 — MCPs local ✅
 - `init`, `plan`, `apply`, `drift` para MCPs en los 4 providers, alcances
   global y proyecto. Estado y backups. Secretos `env:` y `file:`.
 - `import` desde cada agente.

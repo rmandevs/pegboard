@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/rmandevs/agents-casc/internal/agent"
 )
@@ -76,6 +77,11 @@ func (m *Machine) Env() agent.Env {
 		BinVersion: func(path string) string {
 			return m.Bins[filepath.Base(path)]
 		},
+		LookupEnv: func(k string) (string, bool) {
+			v, ok := m.Vars[k]
+			return v, ok
+		},
+		Now: func() time.Time { return time.Date(2026, 10, 19, 12, 0, 0, 0, time.UTC) },
 	}
 }
 
