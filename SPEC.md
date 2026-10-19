@@ -167,6 +167,8 @@ pegboard drift [--exit-code]      # compara estado vs. archivos reales (para CI)
 pegboard update                   # re-resuelve versiones y actualiza pegboard.lock
 pegboard add mcp|skill …          # edita pegboard.yaml de forma segura (para humanos y agentes)
 pegboard remove mcp|skill …
+pegboard install …                # modo ad-hoc: instala ya, sin pegboard.yaml (§4.1)
+pegboard uninstall …              # quita algo instalado ad-hoc
 pegboard agents                   # agentes detectados, rutas y versión de provider
 pegboard skill install            # instala la skill de pegboard en los agentes (§7)
 ```
@@ -180,6 +182,41 @@ conflicto detiene el `apply` salvo `--force` o resolución explícita.
 
 Códigos de salida: `0` sin cambios, `2` hay cambios/drift (con
 `--exit-code`), `1` error.
+
+### 4.1 Modo ad-hoc
+
+Como los comandos ad-hoc de Ansible frente a los playbooks: para "necesito
+esta skill y estos MCPs ya, en mis agentes", sin escribir YAML. Es también la
+puerta de entrada: el primer contacto con Pegboard es una línea, no un
+archivo.
+
+```
+pegboard install skill mattpocock/tdd \
+                 mcp github='npx -y @modelcontextprotocol/server-github' \
+                 mcp notion=https://mcp.notion.com/mcp \
+                 --env GITHUB_TOKEN='${env:GITHUB_TOKEN}' \
+                 --agent claude-code --agent codex      # default: todos los detectados
+pegboard install github.com/rmandevs/stacks//web?ref=v1 # un stack remoto, de una vez
+pegboard uninstall mcp notion
+```
+
+Reglas:
+
+1. **Mismo motor, mismas garantías.** `install` arma un estado deseado
+   temporal y pasa por el mismo `plan` → confirmación → `apply` (con `-y`
+   para saltar la confirmación). Respeta lo ajeno, hace backup y resuelve
+   secretos igual que el modo declarativo.
+2. **Queda registrado.** Cada recurso ad-hoc entra al estado con
+   `origin: adhoc`. Por eso `uninstall` sabe exactamente qué quitar y de
+   dónde.
+3. **No toca `pegboard.yaml`**, salvo con `--save`, que además lo agrega al
+   stack del alcance. Así un experimento rápido se vuelve declarativo con una
+   bandera. `pegboard adopt` promueve después todo lo ad-hoc al YAML.
+4. **No pelea con el modo declarativo.** `apply` no borra lo ad-hoc (no es
+   suyo); `apply --prune-adhoc` sí. `drift` lo lista aparte como "ad-hoc, no
+   declarado", sin marcarlo como error, salvo con `--strict` (útil en CI).
+5. **Alcance por defecto:** `project` si hay un `pegboard.yaml` o un repo git
+   en la carpeta actual; si no, `global`. Se fuerza con `--scope`.
 
 ---
 
@@ -253,8 +290,9 @@ Plan: 3 crear, 1 modificar, 0 quitar, 1 conflicto.
 `pegboard` trae su propia skill (`SKILL.md`), instalable con `pegboard skill install`
 (o declarándola en el stack como cualquier otra). Le enseña al agente a:
 
-1. Nunca editar `.mcp.json`, `config.toml`, etc. a mano: usar `pegboard add` /
-   `pegboard remove` sobre el `pegboard.yaml`.
+1. Nunca editar `.mcp.json`, `config.toml`, etc. a mano. Para pedidos rápidos
+   ("instálame X"), `pegboard install`; si el proyecto ya tiene
+   `pegboard.yaml`, `pegboard add` / `pegboard remove` o `install --save`.
 2. Siempre correr `pegboard plan --json`, mostrar el resumen al usuario y solo
    después `pegboard apply -y`.
 3. Ante un conflicto (`!`), preguntar al usuario en lugar de forzar.
@@ -329,12 +367,15 @@ Cada fase termina cuando la uso a diario sin frustración.
 - `init`, `plan`, `apply`, `drift` para MCPs en los 4 providers, alcances
   global y proyecto. Estado y backups. Secretos `env:` y `file:`.
 - `import` desde cada agente.
+- Modo ad-hoc para MCPs: `install` / `uninstall`, `--save`, `origin: adhoc`
+  en el estado.
 - **Listo cuando:** dejo de editar `.mcp.json` / `config.toml` a mano.
 
 ### Fase 2 — Skills y skill propia
 - Skills locales y de git con caché, symlinks y `pegboard.lock`; `update`.
 - `context.agents_md`.
-- `add` / `remove`, `--json` estable, `pegboard skill install`.
+- `add` / `remove`, `install skill …`, `adopt`, `--json` estable,
+  `pegboard skill install`.
 - **Listo cuando:** le pido a un agente "agrega X a todos" y lo hace con
   `pegboard` sin equivocarse.
 
