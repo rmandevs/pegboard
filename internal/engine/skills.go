@@ -134,7 +134,7 @@ func (p *Plan) skillDir(sc Scope, sd SkillDir, opts Options) error {
 			}
 			c.do = resolve(c.Action, c.Forced, opts.Force)
 			dir := sd.Dir
-			c.run = func() error { return os.RemoveAll(dest) }
+			c.run = func() error { return removeEntry(dest) }
 			c.commit = func(s *state.State) { s.DeleteSkill(dir, name) }
 		}
 		p.Changes = append(p.Changes, c)
@@ -171,7 +171,19 @@ func placeSkill(dest, src string, replace bool) (bool, error) {
 				return false, err
 			}
 		}
-		return false, os.Rename(tmp, dest)
+		if err := os.Rename(tmp, dest); err != nil {
+			// Windows no deja renombrar encima de un symlink a carpeta:
+			// se quita el anterior y se reintenta (ahí deja de ser atómico).
+			if rmErr := removeEntry(dest); rmErr != nil {
+				_ = os.Remove(tmp)
+				return false, err
+			}
+			if err := os.Rename(tmp, dest); err != nil {
+				_ = os.Remove(tmp)
+				return false, err
+			}
+		}
+		return false, nil
 	}
 	if replace {
 		if err := os.RemoveAll(dest); err != nil {
@@ -183,4 +195,19 @@ func placeSkill(dest, src string, replace bool) (bool, error) {
 		return true, err
 	}
 	return true, os.Rename(tmp, dest)
+}
+
+// removeEntry quita un symlink (sin seguirlo) o una carpeta copiada.
+func removeEntry(p string) error {
+	info, err := os.Lstat(p)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if info.Mode()&fs.ModeSymlink != 0 {
+		return os.Remove(p)
+	}
+	return os.RemoveAll(p)
 }
