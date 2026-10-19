@@ -15,16 +15,19 @@ func (Provider) ID() string   { return "hermes" }
 func (Provider) Version() int { return 1 }
 
 // Detect: instalado si `hermes` está en el PATH o existe $HERMES_HOME
-// (~/.hermes). Solo tiene alcance global; cada carpeta en profiles/ es un
-// sub-target hermes:<perfil> con la misma estructura.
+// (~/.hermes). Cada carpeta en profiles/ es un sub-target hermes:<perfil>
+// con la misma estructura. En un proyecto Hermes solo lee skills
+// (.hermes/skills); sus MCPs son siempre globales.
 func (p Provider) Detect(env agent.Env, scope agent.Scope) []agent.Target {
-	if scope != agent.Global {
-		return nil
-	}
 	home := env.EnvDir("HERMES_HOME", ".hermes")
 	bin, evidence := env.Installed("hermes", home)
 	if len(evidence) == 0 {
 		return nil
+	}
+	if scope == agent.Project {
+		dir := filepath.Join(env.ProjectDir, ".hermes")
+		return []agent.Target{env.NewTarget(p, scope, bin, env.Present(dir),
+			agent.Paths{Skills: filepath.Join(dir, "skills")})}
 	}
 	targets := []agent.Target{env.NewTarget(p, scope, bin, evidence, paths(home))}
 	for _, prof := range profiles(home) {

@@ -3,6 +3,7 @@ package engine
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"sort"
 	"time"
@@ -55,10 +56,29 @@ func Apply(p *Plan, backupDir string, now time.Time) (*Result, error) {
 		}
 		res.Written = append(res.Written, Written{File: path, Backup: bk})
 	}
+	for _, c := range p.Changes {
+		if c.run == nil {
+			continue
+		}
+		switch c.do {
+		case Create, Update, Delete:
+			if err := c.run(); err != nil {
+				return res, fmt.Errorf("%s: %w", c.File, err)
+			}
+			res.Written = append(res.Written, Written{File: c.File})
+		}
+	}
 	for _, sc := range p.scopes {
 		changed := false
 		for _, c := range p.Changes {
 			if c.Scope != sc.Scope {
+				continue
+			}
+			if c.commit != nil {
+				if c.do != "" {
+					c.commit(sc.State)
+					changed = true
+				}
 				continue
 			}
 			switch c.do {

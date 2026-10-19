@@ -50,7 +50,7 @@ variables antes de apply.`,
 			out := cmd.OutOrStdout()
 			total := 0
 			for _, c := range ctxs {
-				n, err := importScope(c, out, env)
+				n, err := importScope(c, out, env, false)
 				if err != nil {
 					return err
 				}
@@ -66,11 +66,14 @@ variables antes de apply.`,
 	}
 }
 
-func importScope(c *scopeCtx, out interface{ Write([]byte) (int, error) }, env agent.Env) (int, error) {
+// importScope pasa a pegboard.yaml los MCPs de los targets del alcance. Con
+// adopt=false toma los que pegboard no gestiona (import); con adopt=true,
+// los instalados ad-hoc, y además las skills ad-hoc (adopt).
+func importScope(c *scopeCtx, out interface{ Write([]byte) (int, error) }, env agent.Env, adopt bool) (int, error) {
 	byName := map[string][]found{}
 	var vars []string
 	for _, t := range c.targets {
-		p, ok := mcpProvider(t.Agent)
+		p, ok := mcpProvider(t)
 		if !ok {
 			continue
 		}
@@ -84,7 +87,8 @@ func importScope(c *scopeCtx, out interface{ Write([]byte) (int, error) }, env a
 			return 0, fmt.Errorf("%s: %w", f.Path, err)
 		}
 		for name, obs := range entries {
-			if _, managed := c.state.Get(t.ID(), name); managed {
+			e, managed := c.state.Get(t.ID(), name)
+			if managed != adopt || (adopt && e.Origin != state.Adhoc) {
 				continue
 			}
 			m, err := p.DecodeMCP(obs)
@@ -99,7 +103,17 @@ func importScope(c *scopeCtx, out interface{ Write([]byte) (int, error) }, env a
 			})
 		}
 	}
-	if len(byName) == 0 {
+	var adhocSkills []string
+	if adopt {
+		for _, d := range c.state.SkillDirs() {
+			for _, n := range c.state.SkillNames(d) {
+				if e, _ := c.state.Skill(d, n); e.Origin == state.Adhoc {
+					adhocSkills = appendUnique(adhocSkills, e.Source)
+				}
+			}
+		}
+	}
+	if len(byName) == 0 && len(adhocSkills) == 0 {
 		return 0, nil
 	}
 	var names []string
@@ -151,11 +165,28 @@ func importScope(c *scopeCtx, out interface{ Write([]byte) (int, error) }, env a
 			}
 		}
 		for _, fd := range same {
-			c.state.Set(fd.target.ID(), name, state.Entry{
-				File: fd.file, Hash: native.Hash(fd.obs, fd.masked), Masked: fd.masked, Origin: state.Declared,
-			})
+			e := state.Entry{File: fd.file, Hash: native.Hash(fd.obs, fd.masked), Masked: fd.masked, Origin: state.Declared}
+			if adopt {
+				e, _ = c.state.Get(fd.target.ID(), name)
+				e.Origin = state.Declared
+			}
+			c.state.Set(fd.target.ID(), name, e)
 		}
-		imported = append(imported, fmt.Sprintf("%s (%s)", name, targetIDs(targetsOf(same))))
+		imported = append(imported, fmt.Sprintf("mcp %s (%s)", name, targetIDs(targetsOf(same))))
+	}
+	for _, src := range adhocSkills {
+		if _, err := ed.AddSkill(src); err != nil {
+			return 0, err
+		}
+		for _, d := range c.state.SkillDirs() {
+			for _, n := range c.state.SkillNames(d) {
+				if e, _ := c.state.Skill(d, n); e.Source == src {
+					e.Origin = state.Declared
+					c.state.SetSkill(d, n, e)
+				}
+			}
+		}
+		imported = append(imported, "skill "+src)
 	}
 	if len(imported) == 0 {
 		return 0, nil
@@ -166,9 +197,13 @@ func importScope(c *scopeCtx, out interface{ Write([]byte) (int, error) }, env a
 	if err := c.state.Save(); err != nil {
 		return 0, err
 	}
-	fmt.Fprintf(out, "Importado a %s:\n", env.Pretty(path))
+	verb := "Importado"
+	if adopt {
+		verb = "Adoptado"
+	}
+	fmt.Fprintf(out, "%s a %s:\n", verb, env.Pretty(path))
 	for _, s := range imported {
-		fmt.Fprintf(out, "  + mcp %s\n", s)
+		fmt.Fprintf(out, "  + %s\n", s)
 	}
 	if len(vars) > 0 {
 		sort.Strings(vars)

@@ -144,7 +144,8 @@ func (e Env) Pretty(p string) string {
 	if p == "" {
 		return ""
 	}
-	if e.ProjectDir != "" {
+	// Desde el home, ~/… es más claro que una ruta relativa.
+	if e.ProjectDir != "" && filepath.Clean(e.ProjectDir) != filepath.Clean(e.Home) {
 		if rel, ok := under(e.ProjectDir, p); ok {
 			return filepath.ToSlash(rel)
 		}
@@ -208,4 +209,10 @@ func (e Env) StateDir() string {
 // ConfigDir es $XDG_CONFIG_HOME/pegboard: donde vive el pegboard.yaml global.
 func (e Env) ConfigDir() string {
 	return filepath.Join(e.XDGConfig(), "pegboard")
+}
+
+// CacheDir es $XDG_CACHE_HOME/pegboard (~/.cache/pegboard): las skills
+// descargadas, una sola vez por contenido.
+func (e Env) CacheDir() string {
+	return filepath.Join(e.EnvDir("XDG_CACHE_HOME", ".cache"), "pegboard")
 }

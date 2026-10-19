@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime/debug"
 
 	"github.com/spf13/cobra"
 
@@ -12,8 +13,19 @@ import (
 	"github.com/rmandevs/agents-casc/providers"
 )
 
-// Version se fija al compilar con -ldflags "-X …/internal/cli.Version=x.y.z".
+// Version se fija al compilar con -ldflags "-X …/internal/cli.Version=x.y.z";
+// con `go install …@vX` se toma de la info de compilación.
 var Version = "dev"
+
+func version() string {
+	if Version != "dev" {
+		return Version
+	}
+	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+		return bi.Main.Version
+	}
+	return Version
+}
 
 // EnvFunc construye el entorno para la carpeta de --dir.
 type EnvFunc func(dir string) (agent.Env, error)
@@ -52,7 +64,7 @@ func newRoot(stdin io.Reader, stdout, stderr io.Writer, newEnv EnvFunc) *cobra.C
 	root := &cobra.Command{
 		Use:           "pegboard",
 		Short:         "Configuration as Code para agentes",
-		Version:       Version,
+		Version:       version(),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -74,6 +86,11 @@ func newRoot(stdin io.Reader, stdout, stderr io.Writer, newEnv EnvFunc) *cobra.C
 		newImportCmd(opts, newEnv),
 		newInstallCmd(opts, newEnv),
 		newUninstallCmd(opts, newEnv),
+		newAddCmd(opts, newEnv),
+		newRemoveCmd(opts, newEnv),
+		newAdoptCmd(opts, newEnv),
+		newUpdateCmd(opts, newEnv),
+		newSkillCmd(opts, newEnv),
 	)
 	return root
 }

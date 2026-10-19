@@ -226,12 +226,12 @@ func TestMissingSecret(t *testing.T) {
 
 func TestPolicyAndPhases(t *testing.T) {
 	m := fleet(t)
-	m.File("home/.config/pegboard/pegboard.yaml", globalStack+"policy:\n  allow_mcps: [github]\nskills: [a/b]\n")
+	m.File("home/.config/pegboard/pegboard.yaml", globalStack+"policy:\n  allow_mcps: [github]\n")
 	out := mustRun(t, m, 1, "plan")
 	mustContain(t, "policy", out, "policy.allow_mcps no permite: notion")
-	m.File("home/.config/pegboard/pegboard.yaml", "version: 1\nskills: [a/b]\n")
+	m.File("home/.config/pegboard/pegboard.yaml", "version: 1\ninclude: [github.com/x/y]\n")
 	out = mustRun(t, m, 0, "plan")
-	mustContain(t, "fase 2", out, "aviso:", "skills llegan en la fase 2")
+	mustContain(t, "fase 3", out, "aviso:", "include llega en la fase 3")
 	m.File("home/.config/pegboard/pegboard.yaml", "version: 1\nmcps:\n  x:\n    command: \"${op://v/i}\"\n")
 	mustContain(t, "fase 3", mustRun(t, m, 1, "plan"), "fase 3")
 }
@@ -273,8 +273,8 @@ func TestNoStack(t *testing.T) {
 func TestInit(t *testing.T) {
 	m := fleet(t)
 	out := mustRun(t, m, 0, "init")
-	mustContain(t, "init", out, "Creado pegboard.yaml (agentes: claude-code, codex, opencode)")
-	mustContain(t, "contenido", read(t, m, "proj/pegboard.yaml"), "version: 1\nagents: [claude-code, codex, opencode]\n", "mcps: {}")
+	mustContain(t, "init", out, "Creado pegboard.yaml (agentes: claude-code, codex, opencode, hermes)")
+	mustContain(t, "contenido", read(t, m, "proj/pegboard.yaml"), "version: 1\nagents: [claude-code, codex, opencode, hermes]\n", "mcps: {}")
 	mustRun(t, m, 1, "init")
 	out = mustRun(t, m, 0, "plan")
 	mustContain(t, "plan vacío", out, "Sin cambios")
@@ -329,7 +329,8 @@ func TestInstallSave(t *testing.T) {
 func TestInstallParse(t *testing.T) {
 	m := fleet(t)
 	for args, want := range map[string]string{
-		"install skill mattpocock/tdd":      "fase 2",
+		"install skill":                     "necesita una fuente",
+		"install skill solo":                "no reconocida",
 		"install github.com/x/stacks//web":  "fase 3",
 		"install mcp":                       "nombre=comando",
 		"install mcp a=x --header H=1":      "--header solo aplica",

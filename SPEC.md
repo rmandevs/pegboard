@@ -1,6 +1,6 @@
 # Pegboard — SPEC
 
-Versión: 0.1 · Estado: fases 0 y 1 implementadas (MCPs: plan / apply / drift / import / install)
+Versión: 0.1 · Estado: MVP (fases 0–2): MCPs, skills y AGENTS.md en Claude Code, Codex, opencode y Hermes
 Origen: §4.1–4.2 de `tapioca-core/SPEC.md` (`stack.yaml` + `apply`), separado
 como producto propio. Producto y binario: **Pegboard** / `pegboard`
 (`peg` ya existe en Homebrew; quien quiera puede usar `alias pb=pegboard`).
@@ -113,9 +113,11 @@ mcps:
     agents: [claude-code]                        # restringir a ciertos agentes
 
 skills:
-  - mattpocock/tdd                               # de un repo/registro
+  - mattpocock/skills@tdd                        # una skill de un repo de GitHub
+  - vercel-labs/agent-skills                     # todas las del repo
   - github.com/anthropics/skills//pdf?ref=main
   - ./skills/mi-skill                            # local
+  - pegboard                                     # la skill propia (§7)
 
 context:
   agents_md: true                                # garantiza AGENTS.md y el puente en CLAUDE.md
@@ -167,6 +169,25 @@ contenido) de cada skill, de cada stack incluido y, cuando aplica, del paquete
 del MCP (`npx …@x.y.z`). Se versiona en git. `pegboard apply` usa el lock;
 `pegboard update` lo refresca.
 
+Hoy fija las skills de git (JSON, por fuente):
+
+```json
+{
+  "version": 1,
+  "skills": {
+    "mattpocock/skills@tdd": {
+      "commit": "3f2a…",
+      "skills": { "tdd": "sha256:91c4…" }
+    }
+  }
+}
+```
+
+`apply` escribe en el lock las fuentes nuevas (como `npm install`) y olvida
+las que ya no se declaran. Si el contenido bajado de un commit fijado no
+coincide con su hash, falla. Con el lock y el caché completos, `apply` no
+necesita red. Las skills locales no van al lock.
+
 ### 3.4 Estado
 
 `~/.local/state/pegboard/state.json` (global) y `.pegboard/state.json` (proyecto, en
@@ -186,6 +207,7 @@ pegboard drift [--exit-code]      # compara estado vs. archivos reales (para CI)
 pegboard update                   # re-resuelve versiones y actualiza pegboard.lock
 pegboard add mcp|skill …          # edita pegboard.yaml de forma segura (para humanos y agentes)
 pegboard remove mcp|skill …
+pegboard adopt                    # pasa a pegboard.yaml todo lo instalado ad-hoc
 pegboard install …                # modo ad-hoc: instala ya, sin pegboard.yaml (§4.1)
 pegboard uninstall …              # quita algo instalado ad-hoc
 pegboard agents                   # agentes detectados, rutas y versión de provider
@@ -296,14 +318,18 @@ partida, no verdad.
 |---|---|---|---|---|
 | Claude Code | `claude` · `~/.claude` (`CLAUDE_CONFIG_DIR`) | `~/.claude.json` / `.mcp.json` | `~/.claude/skills/` / `.claude/skills/` | `CLAUDE.md` con `@AGENTS.md` |
 | Codex | `codex` · `~/.codex` (`CODEX_HOME`) | `~/.codex/config.toml` (`[mcp_servers.*]`) / `.codex/config.toml` | `~/.agents/skills/` / `.agents/skills/` | `AGENTS.md` nativo |
-| opencode | `opencode` · `~/.config/opencode` (`XDG_CONFIG_HOME`) | `~/.config/opencode/opencode.json` / `opencode.json` (`mcp`) | `~/.config/opencode/skills/` / `.opencode/skills/` | `AGENTS.md` nativo |
-| Hermes | `hermes` · `~/.hermes` (`HERMES_HOME`) | `~/.hermes/config.yaml` (`mcp_servers`) | `~/.hermes/skills/`; perfiles en `~/.hermes/profiles/<p>/` | `SOUL.md` |
+| opencode | `opencode` · `~/.config/opencode` (`XDG_CONFIG_HOME`) | `~/.config/opencode/opencode.json` / `opencode.json` (`mcp`) | `~/.config/opencode/skills/` / `.agents/skills/` | `AGENTS.md` nativo |
+| Hermes | `hermes` · `~/.hermes` (`HERMES_HOME`) | `~/.hermes/config.yaml` (`mcp_servers`) | `~/.hermes/skills/` / `.hermes/skills/`; perfiles en `~/.hermes/profiles/<p>/` | `SOUL.md` |
 
-Por verificar contra cada agente real: skills globales de Codex y opencode;
-`opencode.jsonc` (hoy solo se escribe `opencode.json`); que `CLAUDE_CONFIG_DIR`
-mueva también `.claude.json`; las llaves `env_vars`, `bearer_token_env_var` y
-`env_http_headers` de Codex; y si Hermes interpola variables en `config.yaml`
-(hoy se asume que no).
+Las carpetas de skills siguen la tabla de agentes de `npx skills`
+(`docs/agents.md` de vercel-labs/skills 1.7.3). En un proyecto, Codex y
+opencode comparten `.agents/skills/` (la carpeta "universal"): la skill se
+enlaza una sola vez y el plan lo muestra como `codex, opencode · project`.
+
+Por verificar contra cada agente real: `opencode.jsonc` (hoy solo se escribe
+`opencode.json`); que `CLAUDE_CONFIG_DIR` mueva también `.claude.json`; las
+llaves `env_vars`, `bearer_token_env_var` y `env_http_headers` de Codex; y si
+Hermes interpola variables en `config.yaml` (hoy se asume que no).
 
 Hermes no tiene alcance de proyecto conocido: solo `global` (y por perfil,
 como sub-target `hermes:<perfil>`).
@@ -319,6 +345,35 @@ Las skills se descargan una vez a un caché (`~/.cache/pegboard/skills/<hash>`) 
 se enlazan (symlink; copia en Windows o si el agente no sigue symlinks) en la
 carpeta de cada agente. Así una skill existe una sola vez en disco y el lock
 garantiza que es la misma en todos lados.
+
+**Fuentes** (las mismas convenciones que `npx skills` y skills.sh, para que un
+repo de skills sirva igual a los dos):
+
+| Fuente | Qué es |
+|---|---|
+| `owner/repo` | todas las skills de un repo de GitHub |
+| `owner/repo@skill` | una sola skill del repo |
+| `github.com/owner/repo//ruta` | host + subcarpeta (estilo go-getter); cualquier host git |
+| `https://github.com/o/r/tree/<ref>/<ruta>` | URL de GitHub o GitLab |
+| `https://…`, `git@…` | cualquier repo git (admite `//ruta`) |
+| `./ruta`, `~/ruta`, `/ruta` | skill local: se enlaza tal cual, sin caché ni lock |
+| `pegboard` | la skill propia (§7), embebida en el binario |
+
+Las fuentes git aceptan `?ref=<rama|tag|commit>`. Se descargan con el `git`
+del sistema (`fetch --depth 1`), así que funcionan las credenciales que ya
+tengas para repos privados. El descubrimiento dentro del repo es el de
+`npx skills`: `SKILL.md` en la raíz; si no, `skills/`, `.agents/skills/` y
+`.claude/skills/` hasta tres niveles; si no, todo el árbol. El nombre sale del
+`name:` del frontmatter.
+
+**Relación con `npx skills`.** No se invoca: pegboard habla el mismo formato
+(fuentes, descubrimiento, carpetas por agente) pero hace la instalación él
+mismo, porque delegarla rompería tres principios. `npx skills` no expone qué
+archivos escribió, así que no habría estado ni drift (principio 2); trae su
+propio lock (`skills-lock.json`), que sería una segunda fuente de verdad; y
+añade una dependencia de Node ≥ 22 a un binario que hoy es único. Lo que sí se
+gana del ecosistema es todo el catálogo: cualquier repo de skills.sh se
+instala igual con `pegboard install skill owner/repo@skill`.
 
 ---
 
@@ -355,6 +410,17 @@ Plan: 3 crear, 1 modificar, 0 quitar, 1 conflicto.
 Con esto, "agrégame el MCP de Linear en todos mis agentes" cuesta un par de
 tool calls deterministas en lugar de que el agente lea y reescriba cuatro
 formatos distintos.
+
+La skill vive en `skill/SKILL.md` y va embebida en el binario: `pegboard skill
+install` la instala en el alcance global de todos los agentes detectados, y
+también puede declararse en un stack como la fuente `pegboard`.
+
+### `context.agents_md`
+
+Solo en un proyecto. Crea `AGENTS.md` si no existe (desde ahí es del usuario:
+pegboard nunca lo borra) y agrega la línea `@AGENTS.md` a `CLAUDE.md` para
+que Claude Code lo lea. Si después se quita `agents_md`, pegboard quita esa
+línea solo si la agregó él.
 
 Opcional (fase 4): `pegboard mcp`, un servidor MCP con tools `plan`, `apply`,
 `add`, `drift` para agentes que prefieran tools a shell.
@@ -425,7 +491,10 @@ Cada fase termina cuando la uso a diario sin frustración.
   en el estado.
 - **Listo cuando:** dejo de editar `.mcp.json` / `config.toml` a mano.
 
-### Fase 2 — Skills y skill propia
+**MVP = fases 0–2**, más releases con goreleaser (`git tag vX.Y.Z` publica
+binarios para Linux, macOS y Windows). Las fases 3 y 4 vienen después.
+
+### Fase 2 — Skills y skill propia ✅
 - Skills locales y de git con caché, symlinks y `pegboard.lock`; `update`.
 - `context.agents_md`.
 - `add` / `remove`, `install skill …`, `adopt`, `--json` estable,

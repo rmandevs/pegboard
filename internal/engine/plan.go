@@ -49,12 +49,16 @@ type Scope struct {
 	State    *state.State
 	Resolver secrets.Resolver
 	Targets  []Target
+	Skills   []SkillDir
+	Context  []ContextFile
 }
 
 // Change es una línea del plan.
 type Change struct {
-	Scope    agent.Scope
-	Target   string
+	Scope  agent.Scope
+	Target string
+	// Kind: mcp, skill o context.
+	Kind     string
 	Name     string
 	Action   Action
 	Origin   state.Origin
@@ -64,9 +68,17 @@ type Change struct {
 	// Forced: un conflicto que --force convierte en esta acción.
 	Forced Action
 
+	// Detail completa la línea cuando no hay Reason (p. ej. a dónde apunta
+	// una skill). Link es la carpeta local a la que apunta, si es local.
+	Detail string
+	Link   string
+
 	entry  state.Entry
 	do     Action // lo que hará Apply; "" en un conflicto sin resolver
 	silent bool   // solo cambia el estado (p. ej. el origen); no se muestra
+	// run escribe en disco (skills, contexto); commit actualiza el estado.
+	run    func() error
+	commit func(*state.State)
 }
 
 // Blocked informa si es un conflicto que Apply no va a resolver.
@@ -100,6 +112,16 @@ func Compute(scopes []Scope, opts Options) (*Plan, error) {
 	for _, sc := range scopes {
 		for _, t := range sc.Targets {
 			if err := p.target(sc, t, opts); err != nil {
+				return nil, err
+			}
+		}
+		for _, sd := range sc.Skills {
+			if err := p.skillDir(sc, sd, opts); err != nil {
+				return nil, err
+			}
+		}
+		for _, cf := range sc.Context {
+			if err := p.context(sc, cf); err != nil {
 				return nil, err
 			}
 		}
@@ -140,7 +162,7 @@ func (p *Plan) target(sc Scope, t Target, opts Options) error {
 		want := t.Wants[name]
 		st, managed := sc.State.Get(tid, name)
 		obs, present := observed[name]
-		c := Change{Scope: sc.Scope, Target: tid, Name: name, File: f.Path}
+		c := Change{Scope: sc.Scope, Target: tid, Kind: "mcp", Name: name, File: f.Path}
 		var obj *native.Obj
 		if want != nil {
 			c.Origin = want.Origin

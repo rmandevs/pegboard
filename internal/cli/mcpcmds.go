@@ -112,21 +112,30 @@ func runDeclarative(cmd *cobra.Command, opts *options, newEnv EnvFunc, f *applyF
 	if err != nil {
 		return err
 	}
-	ctxs, _, err := opts.declarativeScopes(env)
+	ctxs, err := opts.declarativeScopes(env)
 	if err != nil {
 		return err
 	}
 	var scopes []engine.Scope
 	var warnings []string
+	var afters []func() error
 	for _, c := range ctxs {
-		es, w, err := c.declarative(f.pruneAdhoc)
+		es, w, after, err := c.declarative(f.pruneAdhoc)
 		warnings = append(warnings, w...)
 		if err != nil {
 			return err
 		}
 		scopes = append(scopes, es)
+		afters = append(afters, after)
 	}
-	return execute(cmd, opts, env, scopes, warnings, f, apply, nil)
+	return execute(cmd, opts, env, scopes, warnings, f, apply, func() error {
+		for _, a := range afters {
+			if err := a(); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // execute calcula el plan, lo muestra y, si apply, lo aplica tras confirmar.
@@ -247,7 +256,7 @@ func newDriftCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 			}
 			items := []engine.DriftItem{}
 			for _, c := range ctxs {
-				its, err := engine.Drift(c.scope, c.state, mcpProvider)
+				its, err := engine.Drift(c.scope, c.state, mcpProviderByID)
 				if err != nil {
 					return err
 				}

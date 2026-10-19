@@ -14,11 +14,12 @@ func TestDetectNothing(t *testing.T) {
 	}
 }
 
-func TestNoProjectScope(t *testing.T) {
+func TestProjectOnlySkills(t *testing.T) {
 	m := agenttest.New(t)
 	m.Bins["hermes"] = "0.9"
-	if got := (Provider{}).Detect(m.Env(), agent.Project); len(got) != 0 {
-		t.Errorf("Hermes no tiene alcance de proyecto: %+v", got)
+	got := (Provider{}).Detect(m.Env(), agent.Project)
+	if len(got) != 1 || got[0].Paths.MCPs != "" || got[0].Paths.Skills != m.Path("proj/.hermes/skills") {
+		t.Errorf("en proyecto Hermes solo tiene skills: %+v", got)
 	}
 }
 

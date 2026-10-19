@@ -30,8 +30,9 @@ func (p Provider) Detect(env agent.Env, scope agent.Scope) []agent.Target {
 	case agent.Project:
 		dir := env.ProjectDir
 		paths := agent.Paths{
-			MCPs:    filepath.Join(dir, "opencode.json"),
-			Skills:  filepath.Join(dir, ".opencode", "skills"),
+			MCPs: filepath.Join(dir, "opencode.json"),
+			// .agents/skills: la carpeta "universal" que comparte con Codex.
+			Skills:  filepath.Join(dir, ".agents", "skills"),
 			Context: filepath.Join(dir, "AGENTS.md"),
 		}
 		return []agent.Target{env.NewTarget(p, scope, bin,

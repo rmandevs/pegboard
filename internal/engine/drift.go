@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/rmandevs/agents-casc/internal/agent"
@@ -20,12 +21,14 @@ const (
 
 // DriftItem es un MCP registrado en el estado y cómo está en su archivo.
 type DriftItem struct {
-	Scope  agent.Scope  `json:"scope"`
-	Target string       `json:"target"`
-	Name   string       `json:"name"`
-	File   string       `json:"file"`
-	Origin state.Origin `json:"origin"`
-	Kind   DriftKind    `json:"status"`
+	Scope agent.Scope `json:"scope"`
+	// Resource: mcp o skill.
+	Resource string       `json:"kind"`
+	Target   string       `json:"target"`
+	Name     string       `json:"name"`
+	File     string       `json:"file"`
+	Origin   state.Origin `json:"origin"`
+	Kind     DriftKind    `json:"status"`
 }
 
 // Lookup encuentra el provider de un agente por ID.
@@ -55,10 +58,27 @@ func Drift(sc agent.Scope, st *state.State, lookup Lookup) ([]DriftItem, error) 
 				}
 				docs[e.File] = entries
 			}
-			it := DriftItem{Scope: sc, Target: tid, Name: name, File: e.File, Origin: e.Origin, Kind: InSync}
+			it := DriftItem{Scope: sc, Resource: "mcp", Target: tid, Name: name, File: e.File, Origin: e.Origin, Kind: InSync}
 			if obs, ok := entries[name]; !ok {
 				it.Kind = Missing
 			} else if native.Hash(obs, e.Masked) != e.Hash {
+				it.Kind = Edited
+			}
+			out = append(out, it)
+		}
+	}
+	for _, dir := range st.SkillDirs() {
+		for _, name := range st.SkillNames(dir) {
+			e, _ := st.Skill(dir, name)
+			dest := filepath.Join(dir, name)
+			it := DriftItem{Scope: sc, Resource: "skill", Target: "skills", Name: name, File: dest, Origin: e.Origin, Kind: InSync}
+			obs := observe(dest)
+			switch {
+			case obs.err != nil:
+				return nil, obs.err
+			case !obs.exists:
+				it.Kind = Missing
+			case !obs.matches(e.Link, e.Hash, e.Copy):
 				it.Kind = Edited
 			}
 			out = append(out, it)

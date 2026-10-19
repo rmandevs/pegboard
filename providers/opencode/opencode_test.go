@@ -41,7 +41,7 @@ func TestDetectProject(t *testing.T) {
 	m.Bins["opencode"] = "1.0.0"
 	m.File("proj/opencode.jsonc", "{}")
 	got := (Provider{}).Detect(m.Env(), agent.Project)
-	if len(got) != 1 || got[0].Paths.MCPs != m.Path("proj/opencode.json") {
+	if len(got) != 1 || got[0].Paths.MCPs != m.Path("proj/opencode.json") || got[0].Paths.Skills != m.Path("proj/.agents/skills") {
 		t.Fatalf("%+v", got)
 	}
 	if len(got[0].Evidence) != 1 || got[0].Evidence[0] != "opencode.jsonc" {

@@ -48,6 +48,13 @@ func TestPretty(t *testing.T) {
 	}
 }
 
+func TestPrettyFromHome(t *testing.T) {
+	env := Env{Home: filepath.FromSlash("/h"), ProjectDir: filepath.FromSlash("/h")}
+	if got := env.Pretty(filepath.FromSlash("/h/.claude/skills")); got != "~/.claude/skills" {
+		t.Error(got)
+	}
+}
+
 func TestTargetID(t *testing.T) {
 	if id := (Target{Agent: "hermes", Profile: "work"}).ID(); id != "hermes:work" {
 		t.Error(id)

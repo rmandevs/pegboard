@@ -59,7 +59,7 @@ func TestAgentsText(t *testing.T) {
 			t.Errorf("falta %q en:\n%s", want, out)
 		}
 	}
-	if strings.Contains(out, "hermes · project") || strings.Contains(out, "codex") {
+	if strings.Contains(out, "hermes:work · project") || strings.Contains(out, "codex") {
 		t.Errorf("targets de más:\n%s", out)
 	}
 }

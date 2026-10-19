@@ -168,3 +168,44 @@ func toNode(v any) (*yaml.Node, error) {
 	}
 	return n, nil
 }
+
+// ListDoc es un Doc YAML que además edita listas de strings de primer nivel
+// (skills: en pegboard.yaml).
+type ListDoc interface {
+	Doc
+	StringList(key string) []string
+	SetStringList(key string, l []string) error
+}
+
+func (d *yamlDoc) StringList(key string) []string {
+	i := lookup(d.root, key)
+	if i < 0 {
+		return nil
+	}
+	var out []string
+	_ = d.root.Content[i+1].Decode(&out)
+	return out
+}
+
+func (d *yamlDoc) SetStringList(key string, l []string) error {
+	n, err := toNode(l)
+	if err != nil {
+		return err
+	}
+	d.changed = true
+	i := lookup(d.root, key)
+	if len(l) == 0 {
+		if i >= 0 {
+			d.root.Content = append(d.root.Content[:i], d.root.Content[i+2:]...)
+		}
+		return nil
+	}
+	if i >= 0 {
+		// Conservar el estilo (en línea o bloque) que ya tenía.
+		n.Style = d.root.Content[i+1].Style
+		d.root.Content[i+1] = n
+		return nil
+	}
+	d.root.Content = append(d.root.Content, strNode(key), n)
+	return nil
+}

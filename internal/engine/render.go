@@ -23,8 +23,8 @@ func (p *Plan) WriteText(w io.Writer, pretty Pretty) {
 	}
 	width := 0
 	for _, c := range p.Changes {
-		if c.Visible() && len(c.Name) > width {
-			width = len(c.Name)
+		if l := len(c.Kind) + 1 + len(c.Name); c.Visible() && l > width {
+			width = l
 		}
 	}
 	last := ""
@@ -37,6 +37,12 @@ func (p *Plan) WriteText(w io.Writer, pretty Pretty) {
 			last = head
 		}
 		detail := "(" + pretty(c.File) + ")"
+		switch {
+		case c.Detail != "":
+			detail = "(" + pretty(c.File) + " " + c.Detail + ")"
+		case c.Link != "":
+			detail = "(" + pretty(c.File) + " → " + pretty(c.Link) + ")"
+		}
 		if c.Reason != "" {
 			detail = c.Reason
 		}
@@ -49,7 +55,7 @@ func (p *Plan) WriteText(w io.Writer, pretty Pretty) {
 		if c.Origin == state.Adhoc {
 			detail += " [ad-hoc]"
 		}
-		fmt.Fprintf(w, "  %s mcp %-*s  %s\n", symbols[c.Action], width, c.Name, detail)
+		fmt.Fprintf(w, "  %s %-*s  %s\n", symbols[c.Action], width, c.Kind+" "+c.Name, detail)
 		for _, warn := range c.Warnings {
 			fmt.Fprintf(w, "      ⚠ %s\n", warn)
 		}
@@ -80,6 +86,7 @@ type changeJSON struct {
 	Origin   string   `json:"origin,omitempty"`
 	File     string   `json:"file"`
 	Reason   string   `json:"reason,omitempty"`
+	Detail   string   `json:"detail,omitempty"`
 	Warnings []string `json:"warnings"`
 }
 
@@ -111,8 +118,9 @@ func (p *Plan) JSON(warnings []string) PlanJSON {
 			continue
 		}
 		cj := changeJSON{
-			Scope: string(c.Scope), Target: c.Target, Kind: "mcp", Name: c.Name, Action: c.Action,
-			Forced: c.Forced, Origin: string(c.Origin), File: c.File, Reason: c.Reason, Warnings: c.Warnings,
+			Scope: string(c.Scope), Target: c.Target, Kind: c.Kind, Name: c.Name, Action: c.Action,
+			Forced: c.Forced, Origin: string(c.Origin), File: c.File, Reason: c.Reason, Detail: c.Detail,
+			Warnings: c.Warnings,
 		}
 		if cj.Warnings == nil {
 			cj.Warnings = []string{}
@@ -147,7 +155,7 @@ func WriteDriftText(w io.Writer, items []DriftItem, pretty Pretty) {
 		}
 		fmt.Fprintln(w, title)
 		for _, it := range list {
-			fmt.Fprintf(w, "  %s · %s  mcp %s  %s (%s)\n", it.Target, it.Scope, it.Name, label[it.Kind], pretty(it.File))
+			fmt.Fprintf(w, "  %s · %s  %s %s  %s (%s)\n", it.Target, it.Scope, it.Resource, it.Name, label[it.Kind], pretty(it.File))
 		}
 	}
 	if len(items) == 0 {

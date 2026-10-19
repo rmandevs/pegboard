@@ -16,6 +16,7 @@ import (
 	"github.com/rmandevs/agents-casc/internal/mcp"
 	"github.com/rmandevs/agents-casc/internal/native"
 	"github.com/rmandevs/agents-casc/internal/secrets"
+	"github.com/rmandevs/agents-casc/internal/skills"
 	"github.com/rmandevs/agents-casc/schema"
 )
 
@@ -67,6 +68,11 @@ func Load(path string) (*Stack, error) {
 	if err := yaml.Unmarshal(src, s); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
+	for _, src := range s.Skills {
+		if _, err := skills.Parse(src); err != nil {
+			return nil, fmt.Errorf("%s: skills: %w", path, err)
+		}
+	}
 	for _, name := range s.MCPNames() {
 		m := s.MCPs[name]
 		if err := m.Validate(); err != nil {
@@ -109,12 +115,6 @@ func (s *Stack) Desired() (map[string]mcp.MCP, []string, error) {
 	if len(s.Include) > 0 {
 		warnings = append(warnings, s.Path+": include llega en la fase 3; se ignora")
 	}
-	if len(s.Skills) > 0 || len(s.Remove.Skills) > 0 {
-		warnings = append(warnings, s.Path+": skills llegan en la fase 2; se ignoran")
-	}
-	if s.Context.AgentsMD {
-		warnings = append(warnings, s.Path+": context.agents_md llega en la fase 2; se ignora")
-	}
 	out := map[string]mcp.MCP{}
 	for n, m := range s.MCPs {
 		out[n] = m
@@ -146,6 +146,32 @@ func contains(l []string, s string) bool {
 	return false
 }
 
+// LockPath es el pegboard.lock junto al stack.
+func (s *Stack) LockPath() string { return filepath.Join(filepath.Dir(s.Path), skills.LockFile) }
+
+// Removed informa si una skill (por fuente o por nombre) está en remove.skills.
+func (s *Stack) Removed(source, name string) bool {
+	for _, r := range s.Remove.Skills {
+		if r == source || r == name {
+			return true
+		}
+	}
+	return false
+}
+
+// SkillMatches informa si la fuente declarada corresponde a arg: la fuente
+// exacta, owner/repo@arg o una ruta que termina en arg.
+func SkillMatches(source, arg string) bool {
+	if source == arg {
+		return true
+	}
+	base := strings.SplitN(source, "?", 2)[0]
+	if _, skill, ok := strings.Cut(base, "@"); ok && skill == arg {
+		return true
+	}
+	return filepath.Base(filepath.FromSlash(base)) == arg
+}
+
 // Template es el contenido de `pegboard init`.
 func Template(agents []string) string {
 	var b strings.Builder
@@ -165,6 +191,13 @@ mcps: {}
 #      GITHUB_TOKEN: "${env:GITHUB_TOKEN}"
 #  notion:
 #    url: https://mcp.notion.com/mcp
+
+# Skills: owner/repo, owner/repo@skill, github.com/o/r//ruta?ref=v1 o ./local.
+# skills:
+#   - pegboard
+
+# context:
+#   agents_md: true   # AGENTS.md y el puente @AGENTS.md en CLAUDE.md
 `)
 	return b.String()
 }
@@ -180,10 +213,11 @@ func Obj(m mcp.MCP) *native.Obj {
 		SetIf("agents", m.Agents)
 }
 
-// Editor agrega o quita MCPs en un pegboard.yaml conservando comentarios.
+// Editor agrega o quita MCPs y skills en un pegboard.yaml conservando
+// comentarios.
 type Editor struct {
 	path string
-	doc  native.Doc
+	doc  native.ListDoc
 }
 
 // Edit abre el stack para editarlo; si no existe, parte de Template.
@@ -200,11 +234,51 @@ func Edit(path string, agents []string) (*Editor, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Editor{path: path, doc: doc}, nil
+	return &Editor{path: path, doc: doc.(native.ListDoc)}, nil
 }
+
+// Path es el archivo que se edita.
+func (e *Editor) Path() string { return e.path }
 
 func (e *Editor) Set(name string, m mcp.MCP) error { return e.doc.Set(name, Obj(m)) }
 func (e *Editor) Delete(name string) error         { return e.doc.Delete(name) }
+
+// HasMCP informa si el stack declara el MCP.
+func (e *Editor) HasMCP(name string) bool {
+	ents, _ := e.doc.Entries()
+	_, ok := ents[name]
+	return ok
+}
+
+// Skills son las fuentes declaradas.
+func (e *Editor) Skills() []string { return e.doc.StringList("skills") }
+
+// AddSkill agrega una fuente si no estaba; devuelve si la agregó.
+func (e *Editor) AddSkill(source string) (bool, error) {
+	l := e.Skills()
+	for _, s := range l {
+		if s == source {
+			return false, nil
+		}
+	}
+	return true, e.doc.SetStringList("skills", append(l, source))
+}
+
+// RemoveSkill quita las fuentes que corresponden a arg; devuelve cuáles.
+func (e *Editor) RemoveSkill(arg string) ([]string, error) {
+	var keep, gone []string
+	for _, s := range e.Skills() {
+		if SkillMatches(s, arg) {
+			gone = append(gone, s)
+		} else {
+			keep = append(keep, s)
+		}
+	}
+	if len(gone) == 0 {
+		return nil, nil
+	}
+	return gone, e.doc.SetStringList("skills", keep)
+}
 
 // Save valida el resultado contra el schema antes de escribirlo.
 func (e *Editor) Save() error {
