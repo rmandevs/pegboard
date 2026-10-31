@@ -60,6 +60,12 @@ func TestRoundTrip(t *testing.T) {
 		// Codex forwards GITHUB_TOKEN (same key) and env headers.
 		"codex":  {"stdio": true, "http": true},
 		"hermes": {},
+		// These agents expand ${VAR} natively.
+		"pi":       {"stdio": true, "http": true},
+		"omp":      {"stdio": true, "http": true},
+		"openclaw": {"stdio": true, "http": true},
+		"cursor":   {"stdio": true, "http": true},
+		"gemini":   {"stdio": true, "http": true},
 	}
 	for _, p := range All() {
 		mp := p.(agent.MCPProvider)

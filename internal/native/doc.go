@@ -11,9 +11,10 @@ import (
 type Format string
 
 const (
-	JSON Format = "json"
-	TOML Format = "toml"
-	YAML Format = "yaml"
+	JSON  Format = "json"
+	JSON5 Format = "json5"
+	TOML  Format = "toml"
+	YAML  Format = "yaml"
 )
 
 // File describes where a target stores its MCPs: the file, its format, and
@@ -22,6 +23,10 @@ type File struct {
 	Path      string
 	Format    Format
 	Container string
+	// ContainerPath is a nested container path for formats that need one
+	// (for example, ["mcp", "servers"] in OpenClaw's JSON5 config). When
+	// set, it overrides Container.
+	ContainerPath []string
 	// Skeleton is top-level keys added only when creating the file (for
 	// example, "$schema" in opencode.json).
 	Skeleton *Obj
@@ -60,6 +65,8 @@ func Open(f File) (Doc, error) {
 	switch f.Format {
 	case JSON:
 		d, err = openJSON(src, exists, f)
+	case JSON5:
+		d, err = openJSON5(src, exists, f)
 	case TOML:
 		d, err = openTOML(src, exists, f)
 	case YAML:

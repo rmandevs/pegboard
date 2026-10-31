@@ -86,7 +86,7 @@ func TestAgentsErrors(t *testing.T) {
 	if _, errOut, code := run(m, "agents", "--scope", "all"); code != 1 || !strings.Contains(errOut, "--scope") {
 		t.Errorf("code=%d err=%q", code, errOut)
 	}
-	if _, errOut, code := run(m, "agents", "--agent", "cursor"); code != 1 || !strings.Contains(errOut, `"cursor"`) {
+	if _, errOut, code := run(m, "agents", "--agent", "windsurf"); code != 1 || !strings.Contains(errOut, `"windsurf"`) {
 		t.Errorf("code=%d err=%q", code, errOut)
 	}
 }

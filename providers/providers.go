@@ -7,8 +7,13 @@ import (
 	"github.com/rmandevs/agents-casc/internal/agent"
 	"github.com/rmandevs/agents-casc/providers/claudecode"
 	"github.com/rmandevs/agents-casc/providers/codex"
+	"github.com/rmandevs/agents-casc/providers/cursor"
+	"github.com/rmandevs/agents-casc/providers/gemini"
 	"github.com/rmandevs/agents-casc/providers/hermes"
+	"github.com/rmandevs/agents-casc/providers/omp"
+	"github.com/rmandevs/agents-casc/providers/openclaw"
 	"github.com/rmandevs/agents-casc/providers/opencode"
+	"github.com/rmandevs/agents-casc/providers/pi"
 )
 
 // All lists the providers in display order.
@@ -18,6 +23,11 @@ func All() []agent.Provider {
 		codex.Provider{},
 		opencode.Provider{},
 		hermes.Provider{},
+		pi.Provider{},
+		omp.Provider{},
+		openclaw.Provider{},
+		cursor.Provider{},
+		gemini.Provider{},
 	}
 }
 
@@ -54,10 +64,15 @@ func Detect(env agent.Env, provs []agent.Provider, scopes []agent.Scope) []agent
 	return out
 }
 
-// Compile-time check: all four providers handle MCPs.
+// Compile-time check: every provider handles MCPs.
 var (
 	_ agent.MCPProvider = claudecode.Provider{}
 	_ agent.MCPProvider = codex.Provider{}
 	_ agent.MCPProvider = opencode.Provider{}
 	_ agent.MCPProvider = hermes.Provider{}
+	_ agent.MCPProvider = pi.Provider{}
+	_ agent.MCPProvider = omp.Provider{}
+	_ agent.MCPProvider = openclaw.Provider{}
+	_ agent.MCPProvider = cursor.Provider{}
+	_ agent.MCPProvider = gemini.Provider{}
 )
