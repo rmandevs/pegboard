@@ -1,4 +1,4 @@
-// Package stack lee y edita pegboard.yaml (SPEC §3.1).
+// Package stack reads and edits pegboard.yaml (SPEC §3.1).
 package stack
 
 import (
@@ -22,7 +22,7 @@ import (
 
 const FileName = "pegboard.yaml"
 
-// Stack es un pegboard.yaml ya validado.
+// Stack is an already validated pegboard.yaml.
 type Stack struct {
 	Version int                `yaml:"version"`
 	Agents  []string           `yaml:"agents"`
@@ -44,7 +44,7 @@ type Stack struct {
 	Path string `yaml:"-"`
 }
 
-// Path es la ruta del stack de un alcance.
+// Path is the stack path for a scope.
 func Path(env agent.Env, scope agent.Scope) string {
 	if scope == agent.Global {
 		return filepath.Join(env.ConfigDir(), FileName)
@@ -52,7 +52,8 @@ func Path(env agent.Env, scope agent.Scope) string {
 	return filepath.Join(env.ProjectDir, FileName)
 }
 
-// Load lee y valida un pegboard.yaml. Si no existe devuelve (nil, nil).
+// Load reads and validates a pegboard.yaml. If it does not exist it returns
+// (nil, nil).
 func Load(path string) (*Stack, error) {
 	src, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -98,7 +99,7 @@ func strs(m mcp.MCP) []string {
 	return out
 }
 
-// MCPNames son los MCPs declarados, ordenados.
+// MCPNames lists the declared MCPs, sorted.
 func (s *Stack) MCPNames() []string {
 	var out []string
 	for n := range s.MCPs {
@@ -108,12 +109,12 @@ func (s *Stack) MCPNames() []string {
 	return out
 }
 
-// Desired son los MCPs que quedan después de remove, validados contra la
-// política. Las advertencias cubren lo que esta fase todavía ignora.
+// Desired is the set of MCPs left after remove, validated against the
+// policy. Warnings cover what this phase still ignores.
 func (s *Stack) Desired() (map[string]mcp.MCP, []string, error) {
 	var warnings []string
 	if len(s.Include) > 0 {
-		warnings = append(warnings, s.Path+": include llega en la fase 3; se ignora")
+		warnings = append(warnings, s.Path+": include arrives in phase 3; ignoring it")
 	}
 	out := map[string]mcp.MCP{}
 	for n, m := range s.MCPs {
@@ -131,7 +132,7 @@ func (s *Stack) Desired() (map[string]mcp.MCP, []string, error) {
 		}
 		if len(denied) > 0 {
 			sort.Strings(denied)
-			return nil, warnings, fmt.Errorf("%s: policy.allow_mcps no permite: %s", s.Path, strings.Join(denied, ", "))
+			return nil, warnings, fmt.Errorf("%s: policy.allow_mcps does not allow: %s", s.Path, strings.Join(denied, ", "))
 		}
 	}
 	return out, warnings, nil
@@ -146,10 +147,11 @@ func contains(l []string, s string) bool {
 	return false
 }
 
-// LockPath es el pegboard.lock junto al stack.
+// LockPath is the pegboard.lock next to the stack.
 func (s *Stack) LockPath() string { return filepath.Join(filepath.Dir(s.Path), skills.LockFile) }
 
-// Removed informa si una skill (por fuente o por nombre) está en remove.skills.
+// Removed reports whether a skill (by source or by name) is in
+// remove.skills.
 func (s *Stack) Removed(source, name string) bool {
 	for _, r := range s.Remove.Skills {
 		if r == source || r == name {
@@ -159,8 +161,8 @@ func (s *Stack) Removed(source, name string) bool {
 	return false
 }
 
-// SkillMatches informa si la fuente declarada corresponde a arg: la fuente
-// exacta, owner/repo@arg o una ruta que termina en arg.
+// SkillMatches reports whether the declared source corresponds to arg: the
+// exact source, owner/repo@arg, or a path that ends in arg.
 func SkillMatches(source, arg string) bool {
 	if source == arg {
 		return true
@@ -172,17 +174,17 @@ func SkillMatches(source, arg string) bool {
 	return filepath.Base(filepath.FromSlash(base)) == arg
 }
 
-// Template es el contenido de `pegboard init`.
+// Template is the content of `pegboard init`.
 func Template(agents []string) string {
 	var b strings.Builder
-	b.WriteString("# Estado deseado de tus agentes. Ver https://github.com/rmandevs/agents-casc\n")
+	b.WriteString("# Desired state for your agents. See https://github.com/rmandevs/agents-casc\n")
 	b.WriteString("# yaml-language-server: $schema=https://raw.githubusercontent.com/rmandevs/agents-casc/main/schema/pegboard.schema.json\n")
 	b.WriteString("version: 1\n")
 	if len(agents) > 0 {
 		b.WriteString("agents: [" + strings.Join(agents, ", ") + "]\n")
 	}
 	b.WriteString(`
-# Los secretos van como referencia: ${env:NOMBRE} o ${file:~/.secrets/x}.
+# Secrets use references: ${env:NAME} or ${file:~/.secrets/x}.
 mcps: {}
 #  github:
 #    command: npx
@@ -192,17 +194,17 @@ mcps: {}
 #  notion:
 #    url: https://mcp.notion.com/mcp
 
-# Skills: owner/repo, owner/repo@skill, github.com/o/r//ruta?ref=v1 o ./local.
+# Skills: owner/repo, owner/repo@skill, github.com/o/r//path?ref=v1 or ./local.
 # skills:
 #   - pegboard
 
 # context:
-#   agents_md: true   # AGENTS.md y el puente @AGENTS.md en CLAUDE.md
+#   agents_md: true   # AGENTS.md and the @AGENTS.md bridge in CLAUDE.md
 `)
 	return b.String()
 }
 
-// Obj es un MCP en el orden en que se escribe en pegboard.yaml.
+// Obj is an MCP in the order it is written to pegboard.yaml.
 func Obj(m mcp.MCP) *native.Obj {
 	return native.NewObj().
 		SetIf("command", m.Command).
@@ -213,14 +215,15 @@ func Obj(m mcp.MCP) *native.Obj {
 		SetIf("agents", m.Agents)
 }
 
-// Editor agrega o quita MCPs y skills en un pegboard.yaml conservando
-// comentarios.
+// Editor adds or removes MCPs and skills in a pegboard.yaml while preserving
+// comments.
 type Editor struct {
 	path string
 	doc  native.ListDoc
 }
 
-// Edit abre el stack para editarlo; si no existe, parte de Template.
+// Edit opens the stack for editing; if it does not exist, it starts from
+// Template.
 func Edit(path string, agents []string) (*Editor, error) {
 	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -237,23 +240,24 @@ func Edit(path string, agents []string) (*Editor, error) {
 	return &Editor{path: path, doc: doc.(native.ListDoc)}, nil
 }
 
-// Path es el archivo que se edita.
+// Path is the file being edited.
 func (e *Editor) Path() string { return e.path }
 
 func (e *Editor) Set(name string, m mcp.MCP) error { return e.doc.Set(name, Obj(m)) }
 func (e *Editor) Delete(name string) error         { return e.doc.Delete(name) }
 
-// HasMCP informa si el stack declara el MCP.
+// HasMCP reports whether the stack declares the MCP.
 func (e *Editor) HasMCP(name string) bool {
 	ents, _ := e.doc.Entries()
 	_, ok := ents[name]
 	return ok
 }
 
-// Skills son las fuentes declaradas.
+// Skills lists the declared sources.
 func (e *Editor) Skills() []string { return e.doc.StringList("skills") }
 
-// AddSkill agrega una fuente si no estaba; devuelve si la agregó.
+// AddSkill adds a source if it was not already there; it reports whether it
+// was added.
 func (e *Editor) AddSkill(source string) (bool, error) {
 	l := e.Skills()
 	for _, s := range l {
@@ -264,7 +268,8 @@ func (e *Editor) AddSkill(source string) (bool, error) {
 	return true, e.doc.SetStringList("skills", append(l, source))
 }
 
-// RemoveSkill quita las fuentes que corresponden a arg; devuelve cuáles.
+// RemoveSkill removes the sources that correspond to arg; it returns which
+// ones were removed.
 func (e *Editor) RemoveSkill(arg string) ([]string, error) {
 	var keep, gone []string
 	for _, s := range e.Skills() {
@@ -280,14 +285,14 @@ func (e *Editor) RemoveSkill(arg string) ([]string, error) {
 	return gone, e.doc.SetStringList("skills", keep)
 }
 
-// Save valida el resultado contra el schema antes de escribirlo.
+// Save validates the result against the schema before writing it.
 func (e *Editor) Save() error {
 	b, err := e.doc.Bytes()
 	if err != nil {
 		return err
 	}
 	if err := schema.ValidateYAML(b); err != nil {
-		return fmt.Errorf("el %s resultante no es válido: %w", FileName, err)
+		return fmt.Errorf("the resulting %s is not valid: %w", FileName, err)
 	}
 	return os.WriteFile(e.path, b, 0o644)
 }

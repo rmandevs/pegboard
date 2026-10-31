@@ -12,8 +12,8 @@ var versionRe = regexp.MustCompile(`v?(\d+\.\d+(?:\.\d+)?(?:[-+][0-9A-Za-z.-]+)?
 
 func lookPath(bin string) (string, error) { return exec.LookPath(bin) }
 
-// binVersion corre `bin --version` con un timeout corto y extrae la primera
-// versión con forma x.y[.z]. Si el binario tarda o falla, devuelve "".
+// binVersion runs `bin --version` with a short timeout and extracts the first
+// version shaped like x.y[.z]. If the binary is slow or fails, it returns "".
 func binVersion(path string) string {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -24,7 +24,7 @@ func binVersion(path string) string {
 	return ParseVersion(string(out))
 }
 
-// ParseVersion extrae la primera versión de la salida de `--version`.
+// ParseVersion extracts the first version from the output of `--version`.
 func ParseVersion(out string) string {
 	m := versionRe.FindStringSubmatch(out)
 	if m == nil {
@@ -33,8 +33,8 @@ func ParseVersion(out string) string {
 	return m[1]
 }
 
-// memo cachea f por argumento: global y proyecto preguntan por el mismo
-// binario y `--version` puede tardar.
+// memo caches f per argument: the global and project scopes ask about the
+// same binary, and `--version` can be slow.
 func memo(f func(string) string) func(string) string {
 	var mu sync.Mutex
 	cache := map[string]string{}

@@ -1,4 +1,4 @@
-// pegboard: Configuration as Code para agentes. Ver SPEC.md.
+// pegboard: Configuration as Code for agents. See SPEC.md.
 package main
 
 import (

@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-// Format es el formato de un archivo de config.
+// Format is the format of a config file.
 type Format string
 
 const (
@@ -16,36 +16,37 @@ const (
 	YAML Format = "yaml"
 )
 
-// File describe dónde guarda un target sus MCPs: el archivo, su formato y la
-// llave de primer nivel que los contiene (mcpServers, mcp, mcp_servers).
+// File describes where a target stores its MCPs: the file, its format, and
+// the top-level key that contains them (mcpServers, mcp, mcp_servers).
 type File struct {
 	Path      string
 	Format    Format
 	Container string
-	// Skeleton son llaves de primer nivel que se agregan solo al crear el
-	// archivo (p. ej. "$schema" en opencode.json).
+	// Skeleton is top-level keys added only when creating the file (for
+	// example, "$schema" in opencode.json).
 	Skeleton *Obj
 }
 
-// Doc es un archivo abierto para editar sus entradas. Solo se reescribe la
-// parte del contenedor; el resto del archivo queda como estaba (en YAML, lo
-// que permita el codificador).
+// Doc is a file opened for editing its entries. Only the container is
+// rewritten; the rest of the file stays as it was (in YAML, as far as the
+// encoder allows).
 type Doc interface {
-	// Entries son las entradas actuales del contenedor, en forma Plain.
+	// Entries are the current entries in the container, in Plain shape.
 	Entries() (map[string]any, error)
 	Set(name string, v *Obj) error
 	Delete(name string) error
-	// Bytes es el contenido resultante; igual al original si no hubo cambios.
+	// Bytes is the resulting content; equal to the original if nothing
+	// changed.
 	Bytes() ([]byte, error)
-	// Exists informa si el archivo existía al abrirlo.
+	// Exists reports whether the file existed when it was opened.
 	Exists() bool
 }
 
-// ErrUnsupported marca entradas escritas de una forma que pegboard no sabe
-// editar sin riesgo; el plan las muestra como conflicto.
-var ErrUnsupported = errors.New("formato no soportado")
+// ErrUnsupported marks entries written in a way pegboard cannot safely edit;
+// the plan shows them as conflicts.
+var ErrUnsupported = errors.New("unsupported format")
 
-// Open lee el archivo (si existe) y lo prepara para editar.
+// Open reads the file (if it exists) and prepares it for editing.
 func Open(f File) (Doc, error) {
 	src, err := os.ReadFile(f.Path)
 	exists := true
@@ -64,7 +65,7 @@ func Open(f File) (Doc, error) {
 	case YAML:
 		d, err = openYAML(src, exists, f)
 	default:
-		return nil, fmt.Errorf("formato desconocido %q", f.Format)
+		return nil, fmt.Errorf("unknown format %q", f.Format)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", f.Path, err)

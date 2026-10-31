@@ -10,7 +10,7 @@ import (
 func TestDetectNothing(t *testing.T) {
 	m := agenttest.New(t)
 	if got := (Provider{}).Detect(m.Env(), agent.Project); len(got) != 0 {
-		t.Errorf("no debía detectar nada: %+v", got)
+		t.Errorf("it should not detect anything: %+v", got)
 	}
 }
 
@@ -22,7 +22,7 @@ func TestDetectGlobal(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 	if got[0].Paths.MCPs != m.Path("home/.config/opencode/opencode.json") {
-		t.Errorf("rutas: %+v", got[0].Paths)
+		t.Errorf("paths: %+v", got[0].Paths)
 	}
 }
 
@@ -45,6 +45,6 @@ func TestDetectProject(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 	if len(got[0].Evidence) != 1 || got[0].Evidence[0] != "opencode.jsonc" {
-		t.Errorf("evidencia: %v", got[0].Evidence)
+		t.Errorf("evidence: %v", got[0].Evidence)
 	}
 }

@@ -10,8 +10,8 @@ func (Provider) MCPFile(t agent.Target) native.File {
 	return native.File{Path: t.Paths.MCPs, Format: native.YAML, Container: "mcp_servers"}
 }
 
-// Hermes no tiene (que sepamos) referencias a variables en config.yaml: los
-// secretos se resuelven y el plan avisa que quedan en claro.
+// Hermes has (as far as we know) no variable references in config.yaml:
+// secrets are resolved and the plan warns that they remain in plain text.
 func (Provider) EncodeMCP(m mcp.MCP, enc *agent.Encoder) (*native.Obj, error) {
 	o := native.NewObj()
 	if m.Remote() {

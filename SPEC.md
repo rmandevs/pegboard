@@ -1,105 +1,106 @@
 # Pegboard — SPEC
 
-Versión: 0.1 · Estado: MVP (fases 0–2): MCPs, skills y AGENTS.md en Claude Code, Codex, opencode y Hermes
-Origen: §4.1–4.2 de `tapioca-core/SPEC.md` (`stack.yaml` + `apply`), separado
-como producto propio. Producto y binario: **Pegboard** / `pegboard`
-(`peg` ya existe en Homebrew; quien quiera puede usar `alias pb=pegboard`).
+Version: 0.1 · Status: MVP (phases 0–2): MCPs, skills, and AGENTS.md in Claude Code, Codex, opencode, and Hermes
+Origin: §4.1–4.2 of `tapioca-core/SPEC.md` (`stack.yaml` + `apply`), split out
+as its own product. Product and binary: **Pegboard** / `pegboard`
+(`peg` already exists in Homebrew; anyone who wants can use `alias pb=pegboard`).
 
 ---
 
-## 1. Qué es
+## 1. What it is
 
-**Configuration as Code para agentes.** Declaras en YAML qué MCPs, skills y
-contexto quieres y en qué agentes (Claude Code, Codex, opencode, Hermes…), y
-`pegboard` deja cada agente configurado con sus archivos nativos. Piensa en
-Ansible (roles redistribuibles, idempotencia) con la disciplina de Terraform
-(`plan`, `apply`, estado, drift, lock).
+**Configuration as Code for agents.** You declare in YAML which MCPs, skills,
+and context you want and in which agents (Claude Code, Codex, opencode,
+Hermes…), and `pegboard` leaves each agent configured with its native files.
+Think Ansible (redistributable roles, idempotency) with Terraform's discipline
+(`plan`, `apply`, state, drift, lock).
 
-El problema que resuelve: hoy cada agente guarda MCPs y skills en un lugar y
-formato distinto. Sincronizarlos es traducir a mano o pedirle a un agente que
-lo haga a ciegas, gastando tokens y con riesgo de que quede mal. `pegboard` hace
-esa traducción con código determinista y probado, y le da a los propios
-agentes una skill para usarlo bien (§7).
+The problem it solves: today each agent stores MCPs and skills in a different
+place and format. Syncing them means translating by hand or asking an agent to
+do it blind, burning tokens and risking mistakes. `pegboard` does that
+translation with deterministic, tested code, and gives the agents themselves a
+skill to use it well (§7).
 
-### El nombre
+### The name
 
-Un *pegboard* es el tablero perforado del taller donde cuelgas las
-herramientas. En su variante *shadow board* cada herramienta tiene su silueta
-pintada: cada cosa tiene su lugar exacto y de un vistazo ves qué falta o qué
-está fuera de lugar. Es el producto entero:
+A *pegboard* is the perforated workshop board where you hang your tools. In
+its *shadow board* variant, every tool has a painted silhouette: everything
+has its exact place, and at a glance you see what is missing or out of place.
+That is the whole product:
 
-| Taller | Pegboard |
+| Workshop | Pegboard |
 |---|---|
-| Las herramientas | MCPs (literalmente, las tools del agente) y skills |
-| Las siluetas pintadas | `pegboard.yaml`: el estado deseado |
-| Ver qué silueta está vacía | `pegboard drift` |
-| Regresar cada herramienta a su silueta | `pegboard apply` |
+| The tools | MCPs (literally, the agent's tools) and skills |
+| The painted silhouettes | `pegboard.yaml`: the desired state |
+| Seeing which silhouette is empty | `pegboard drift` |
+| Returning each tool to its silhouette | `pegboard apply` |
 
-**Icono:** un tablero con agujeritos, una herramienta colgada y una silueta
-vacía al lado. Debe leerse a 16 px.
+**Icon:** a board with little holes, one hanging tool, and an empty
+silhouette next to it. It must read at 16 px.
 
-### Por qué no otra cosa
+### Why not something else
 
-| Alternativa | Qué le falta |
+| Alternative | What it lacks |
 |---|---|
-| rulesync, ruler, vsync, sync-agents-settings | Son generadores/copiadores: traducen una fuente, pero sin `plan`, sin estado de lo que crearon, sin lock y sin stacks redistribuibles |
-| add-mcp, `npx skills` | Instaladores puntuales de una sola cosa; no hay estado deseado |
-| Ansible / Chef con `template` | Sirven de transporte, pero tendrías que escribir a mano el formato y las rutas de cada agente, sin mezclar con lo existente ni detectar drift |
-| Pedírselo a un agente | No determinista, gasta tokens, no deja registro ni se puede repetir |
+| rulesync, ruler, vsync, sync-agents-settings | They are generators/copiers: they translate a source, but without `plan`, without state of what they created, without a lock, and without redistributable stacks |
+| add-mcp, `npx skills` | One-off installers for a single thing; there is no desired state |
+| Ansible / Chef with `template` | They work as transport, but you would have to write each agent's format and paths by hand, without merging with existing content or detecting drift |
+| Asking an agent to do it | Non-deterministic, burns tokens, leaves no record, and cannot be repeated |
 
-### Principios
+### Principles
 
-1. **Lo determinista es código, no LLM.** Traducir configs es una función con
-   tests por agente. Un agente puede invocar `pegboard`, nunca improvisar su
-   trabajo.
-2. **Nunca pisar lo ajeno.** `pegboard` solo toca las llaves, archivos y links que
-   él creó (registrados en el estado). Lo que el usuario escribió a mano se
-   respeta.
-3. **Primero mostrar, luego escribir.** Todo cambio pasa por un `plan` legible.
-4. **Idempotente.** `apply` dos veces = mismo resultado, cero cambios la
-   segunda vez.
-5. **Los secretos nunca viven en el YAML.** Solo referencias.
-6. **La verdad vive en archivos legibles** y versionables en git.
-7. **Pull, no push.** `pegboard` configura la máquina donde corre. Llevarlo a
-   otras máquinas es trabajo de git, CI, Ansible o un MDM (§8).
+1. **Deterministic work is code, not an LLM.** Translating configs is a
+   function with tests per agent. An agent may invoke `pegboard`, never
+   improvise its work.
+2. **Never overwrite what is not yours.** `pegboard` only touches the keys,
+   files, and links it created (recorded in state). What the user wrote by
+   hand is respected.
+3. **Show first, write later.** Every change goes through a readable `plan`.
+4. **Idempotent.** `apply` twice = same result, zero changes the second time.
+5. **Secrets never live in the YAML.** References only.
+6. **The truth lives in readable, git-versionable files.**
+7. **Pull, not push.** `pegboard` configures the machine where it runs. Moving
+   it to other machines is the job of git, CI, Ansible, or an MDM (§8).
 
-### No-objetivos (por ahora)
+### Non-goals (for now)
 
-- Empujar configs a máquinas remotas (SSH, agentes de flota).
-- Instalar los harnesses en sí (solo se configuran los que ya están).
-- Gestionar modelos, API keys de proveedores o permisos de los harnesses.
-- Ser un registro/marketplace de MCPs o skills.
+- Pushing configs to remote machines (SSH, fleet agents).
+- Installing the harnesses themselves (only those already installed are
+  configured).
+- Managing models, provider API keys, or harness permissions.
+- Being a registry/marketplace of MCPs or skills.
 
 ---
 
-## 2. Conceptos
+## 2. Concepts
 
-| Concepto | Qué es | Análogo |
+| Concept | What it is | Analogue |
 |---|---|---|
-| **Stack** | Un `pegboard.yaml`: el estado deseado de un alcance | playbook / módulo raíz |
-| **Alcance** (scope) | `global` (tu usuario) o `project` (una carpeta) | inventario |
-| **Target** | Un agente instalado en un alcance (p. ej. Claude Code × proyecto) | host |
-| **Provider** | Adaptador de un agente: sabe leer, mezclar y escribir sus archivos | módulo / provider |
-| **Recurso** | Un MCP, una skill o una regla de contexto | recurso / tarea |
-| **Stack remoto** | Un stack publicado (repo git) que otro incluye con `include` | rol de Galaxy / módulo remoto |
-| **Estado** | Registro de qué escribió `pegboard` en cada target | `terraform.tfstate` |
-| **Lock** | Versiones y hashes exactos de lo resuelto | `.terraform.lock.hcl` |
+| **Stack** | A `pegboard.yaml`: the desired state of a scope | playbook / root module |
+| **Scope** | `global` (your user) or `project` (a directory) | inventory |
+| **Target** | An agent installed in a scope (for example, Claude Code × project) | host |
+| **Provider** | An agent adapter: it knows how to read, merge, and write its files | module / provider |
+| **Resource** | An MCP, a skill, or a context rule | resource / task |
+| **Remote stack** | A published stack (git repo) that another stack includes with `include` | Galaxy role / remote module |
+| **State** | Record of what `pegboard` wrote to each target | `terraform.tfstate` |
+| **Lock** | Exact versions and hashes of what was resolved | `.terraform.lock.hcl` |
 
 ---
 
-## 3. Formato
+## 3. Format
 
 ### 3.1 `pegboard.yaml`
 
-Uno global (`~/.config/pegboard/pegboard.yaml`) y uno por proyecto (`./pegboard.yaml`).
-Validado con JSON Schema publicado (autocompletado en editores).
+One global (`~/.config/pegboard/pegboard.yaml`) and one per project
+(`./pegboard.yaml`). Validated with a published JSON Schema (editor
+autocompletion).
 
 ```yaml
 version: 1
-agents: [claude-code, codex, opencode, hermes]   # targets; default: los detectados
-inherit: global                                  # global | none (solo en proyecto)
+agents: [claude-code, codex, opencode, hermes]   # targets; default: detected ones
+inherit: global                                  # global | none (project only)
 
-include:                                         # stacks remotos (fase 3)
+include:                                         # remote stacks (phase 3)
   - github.com/rmandevs/stacks//web?ref=v1
 
 mcps:
@@ -110,66 +111,67 @@ mcps:
       GITHUB_TOKEN: "${env:GITHUB_TOKEN}"
   notion:
     url: https://mcp.notion.com/mcp
-    agents: [claude-code]                        # restringir a ciertos agentes
+    agents: [claude-code]                        # restrict to certain agents
 
 skills:
-  - mattpocock/skills@tdd                        # una skill de un repo de GitHub
-  - vercel-labs/agent-skills                     # todas las del repo
+  - mattpocock/skills@tdd                        # one skill from a GitHub repo
+  - vercel-labs/agent-skills                     # all skills in the repo
   - github.com/anthropics/skills//pdf?ref=main
-  - ./skills/mi-skill                            # local
-  - pegboard                                     # la skill propia (§7)
+  - ./skills/my-skill                            # local
+  - pegboard                                     # the built-in skill (§7)
 
 context:
-  agents_md: true                                # garantiza AGENTS.md y el puente en CLAUDE.md
+  agents_md: true                                # guarantees AGENTS.md and the CLAUDE.md bridge
 
-remove:                                          # quitar algo heredado o incluido
+remove:                                          # remove something inherited or included
   mcps: [notion]
 ```
 
-Reglas de mezcla: `global` → `include` (en orden) → proyecto. Lo posterior
-gana por llave; `remove` se aplica al final.
+Merge rules: `global` → `include` (in order) → project. Later entries win per
+key; `remove` is applied at the end.
 
-En la fase 1 cada alcance aplica su propio stack a sus propios targets: el
-global a `~/.claude.json`, `~/.codex/config.toml`…; el de proyecto a
-`.mcp.json`, `.codex/config.toml`… Los agentes ya leen la config global
-además de la del proyecto, así que copiar lo global en cada proyecto sería
-duplicarlo. Sin `--scope`, `plan`/`apply` trabajan sobre los alcances que
-tienen `pegboard.yaml`; `inherit: none` en el proyecto excluye el global.
+In phase 1 each scope applies its own stack to its own targets: the global
+one to `~/.claude.json`, `~/.codex/config.toml`…; the project one to
+`.mcp.json`, `.codex/config.toml`… Agents already read the global config in
+addition to the project one, so copying the global one into every project
+would duplicate it. Without `--scope`, `plan`/`apply` work on the scopes that
+have a `pegboard.yaml`; `inherit: none` in the project excludes the global
+scope.
 
-### 3.2 Secretos
+### 3.2 Secrets
 
-Valores con `${…}` se resuelven al aplicar y **nunca** se escriben en el
-estado ni en el lock:
+Values with `${…}` are resolved at apply time and are **never** written to
+state or the lock:
 
-- `${env:NOMBRE}` — variable de entorno.
-- `${file:~/.secrets/x}` — contenido de un archivo.
-- `${op://vault/item/campo}` — 1Password CLI (fase 3).
-- `${keychain:servicio}` — llavero del sistema (fase 3).
+- `${env:NAME}` — environment variable.
+- `${file:~/.secrets/x}` — file contents.
+- `${op://vault/item/field}` — 1Password CLI (phase 3).
+- `${keychain:service}` — system keychain (phase 3).
 
-Si el agente destino admite referencias a env de forma nativa, el provider las
-deja como referencia en lugar de escribir el valor en claro. Si no, avisa en el
-`plan` que el secreto quedará en texto plano en ese archivo.
+If the target agent supports env references natively, the provider leaves
+them as references instead of writing the plain-text value. If not, it warns
+in the `plan` that the secret will remain in plain text in that file.
 
-| Agente | `${env:X}` | `${file:…}` |
+| Agent | `${env:X}` | `${file:…}` |
 |---|---|---|
-| Claude Code | `${X}` (lo expande Claude Code) | en claro |
-| Codex | `env_vars = ["X"]` si la llave es `X`; `Authorization: Bearer ${env:X}` → `bearer_token_env_var`; header `${env:X}` → `env_http_headers`; lo demás en claro | en claro |
-| opencode | `{env:X}` | `{file:/ruta/absoluta}` |
-| Hermes | en claro | en claro |
+| Claude Code | `${X}` (Claude Code expands it) | plain text |
+| Codex | `env_vars = ["X"]` if the key is `X`; `Authorization: Bearer ${env:X}` → `bearer_token_env_var`; header `${env:X}` → `env_http_headers`; everything else plain text | plain text |
+| opencode | `{env:X}` | `{file:/absolute/path}` |
+| Hermes | plain text | plain text |
 
-El estado guarda un hash de cada entrada con los valores en claro
-enmascarados: detecta ediciones a mano sin depender del secreto. Como el
-`plan` compara lo que hay en el archivo con lo recién resuelto, rotar un
-secreto en claro se ve como `~ modificar`.
+State stores a hash of each entry with plain-text values masked: it detects
+manual edits without depending on the secret. Because `plan` compares what is
+in the file with what was just resolved, rotating a plain-text secret shows
+up as `~ update`.
 
 ### 3.3 `pegboard.lock`
 
-Junto a cada `pegboard.yaml`. Fija la versión exacta (commit, tag, hash del
-contenido) de cada skill, de cada stack incluido y, cuando aplica, del paquete
-del MCP (`npx …@x.y.z`). Se versiona en git. `pegboard apply` usa el lock;
-`pegboard update` lo refresca.
+Next to each `pegboard.yaml`. It pins the exact version (commit, tag, content
+hash) of each skill, each included stack, and, when applicable, the MCP
+package (`npx …@x.y.z`). It is versioned in git. `pegboard apply` uses the
+lock; `pegboard update` refreshes it.
 
-Hoy fija las skills de git (JSON, por fuente):
+Today it pins git skills (JSON, per source):
 
 ```json
 {
@@ -183,201 +185,206 @@ Hoy fija las skills de git (JSON, por fuente):
 }
 ```
 
-`apply` escribe en el lock las fuentes nuevas (como `npm install`) y olvida
-las que ya no se declaran. Si el contenido bajado de un commit fijado no
-coincide con su hash, falla. Con el lock y el caché completos, `apply` no
-necesita red. Las skills locales no van al lock.
+`apply` writes new sources into the lock (like `npm install`) and forgets
+those no longer declared. If content downloaded from a pinned commit does not
+match its hash, it fails. With a complete lock and cache, `apply` does not
+need the network. Local skills are not added to the lock.
 
-### 3.4 Estado
+### 3.4 State
 
-`~/.local/state/pegboard/state.json` (global) y `.pegboard/state.json` (proyecto, en
-`.gitignore`). Por target registra qué llaves, archivos y symlinks creó `pegboard`
-y su hash. Es lo que permite el principio 2 y detectar drift.
+`~/.local/state/pegboard/state.json` (global) and `.pegboard/state.json`
+(project, in `.gitignore`). Per target it records which keys, files, and
+symlinks `pegboard` created and their hash. This is what enables principle 2
+and drift detection.
 
 ---
 
 ## 4. CLI
 
 ```
-pegboard init                     # crea pegboard.yaml (detecta agentes instalados)
-pegboard import [--agent X]       # adopta la config existente de los agentes al pegboard.yaml
-pegboard plan                     # diff de lo que cambiaría; no escribe nada
-pegboard apply [-y]               # aplica el plan (pide confirmación sin -y)
-pegboard drift [--exit-code]      # compara estado vs. archivos reales (para CI)
-pegboard update                   # re-resuelve versiones y actualiza pegboard.lock
-pegboard add mcp|skill …          # edita pegboard.yaml de forma segura (para humanos y agentes)
+pegboard init                     # creates pegboard.yaml (detects installed agents)
+pegboard import [--agent X]       # adopts the agents' existing config into pegboard.yaml
+pegboard plan                     # diff of what would change; writes nothing
+pegboard apply [-y]               # applies the plan (asks for confirmation without -y)
+pegboard drift [--exit-code]      # compares state vs. real files (for CI)
+pegboard update                   # re-resolves versions and updates pegboard.lock
+pegboard add mcp|skill …          # edits pegboard.yaml safely (for humans and agents)
 pegboard remove mcp|skill …
-pegboard adopt                    # pasa a pegboard.yaml todo lo instalado ad-hoc
-pegboard install …                # modo ad-hoc: instala ya, sin pegboard.yaml (§4.1)
-pegboard uninstall …              # quita algo instalado ad-hoc
-pegboard agents                   # agentes detectados, rutas y versión de provider
-pegboard skill install            # instala la skill de pegboard en los agentes (§7)
+pegboard adopt                    # moves everything installed ad-hoc into pegboard.yaml
+pegboard install …                # ad-hoc mode: install now, without pegboard.yaml (§4.1)
+pegboard uninstall …              # removes something installed ad-hoc
+pegboard agents                   # detected agents, paths, and provider version
+pegboard skill install            # installs pegboard's skill on agents (§7)
+pegboard skill uninstall          # uninstalls pegboard's skill from agents (§7)
 ```
 
-Banderas comunes: `--scope global|project`, `--agent <id>` (repetible),
-`--json` (salida estable para agentes y scripts), `--dir <ruta>`.
+Common flags: `--scope global|project`, `--agent <id>` (repeatable), `--json`
+(stable output for agents and scripts), `--dir <path>`.
 
-`plan` muestra, por target, cada recurso como `+` crear, `~` modificar,
-`-` quitar, `=` adoptar (ya estaba exactamente así; solo se registra) o `!`
-conflicto. Hay conflicto cuando alguien editó a mano algo que `pegboard`
-maneja, cuando ya existe una entrada con ese nombre que `pegboard` no creó, o
-cuando está escrita de una forma que no sabe editar sin riesgo (p. ej. una
-tabla en línea en TOML). Un conflicto detiene el `apply` salvo `--force`.
+`plan` shows, per target, each resource as `+` create, `~` update, `-` remove,
+`=` adopt (it was already exactly like that; it is only recorded), or `!`
+conflict. A conflict exists when someone edited by hand something `pegboard`
+manages, when an entry with that name already exists that `pegboard` did not
+create, or when it is written in a way pegboard cannot safely edit (for
+example, an inline table in TOML). A conflict stops `apply` unless `--force`
+is used.
 
-Códigos de salida: `0` sin cambios, `2` hay cambios/drift (con
-`--exit-code`), `1` error.
+Exit codes: `0` no changes, `2` there are changes/drift (with `--exit-code`),
+`1` error.
 
-### 4.1 Modo ad-hoc
+### 4.1 Ad-hoc mode
 
-Como los comandos ad-hoc de Ansible frente a los playbooks: para "necesito
-esta skill y estos MCPs ya, en mis agentes", sin escribir YAML. Es también la
-puerta de entrada: el primer contacto con Pegboard es una línea, no un
-archivo.
+Like Ansible's ad-hoc commands versus playbooks: for "I need this skill and
+these MCPs now, on my agents", without writing YAML. It is also the entry
+point: the first contact with Pegboard is one line, not a file.
 
 ```
 pegboard install skill mattpocock/tdd \
                  mcp github='npx -y @modelcontextprotocol/server-github' \
                  mcp notion=https://mcp.notion.com/mcp \
                  --env GITHUB_TOKEN='${env:GITHUB_TOKEN}' \
-                 --agent claude-code --agent codex      # default: todos los detectados
-pegboard install github.com/rmandevs/stacks//web?ref=v1 # un stack remoto, de una vez
+                 --agent claude-code --agent codex      # default: all detected
+pegboard install github.com/rmandevs/stacks//web?ref=v1 # a remote stack, at once
 pegboard uninstall mcp notion
 ```
 
-Reglas:
+Rules:
 
-1. **Mismo motor, mismas garantías.** `install` arma un estado deseado
-   temporal y pasa por el mismo `plan` → confirmación → `apply` (con `-y`
-   para saltar la confirmación). Respeta lo ajeno, hace backup y resuelve
-   secretos igual que el modo declarativo.
-2. **Queda registrado.** Cada recurso ad-hoc entra al estado con
-   `origin: adhoc`. Por eso `uninstall` sabe exactamente qué quitar y de
-   dónde.
-3. **No toca `pegboard.yaml`**, salvo con `--save`, que además lo agrega al
-   stack del alcance. Así un experimento rápido se vuelve declarativo con una
-   bandera. `pegboard adopt` promueve después todo lo ad-hoc al YAML.
-4. **No pelea con el modo declarativo.** `apply` no borra lo ad-hoc (no es
-   suyo); `apply --prune-adhoc` sí. `drift` lo lista aparte como "ad-hoc, no
-   declarado", sin marcarlo como error, salvo con `--strict` (útil en CI).
-5. **Alcance por defecto:** `project` si hay un `pegboard.yaml` o un repo git
-   en la carpeta actual; si no, `global`. Se fuerza con `--scope`.
+1. **Same engine, same guarantees.** `install` builds a temporary desired
+   state and goes through the same `plan` → confirmation → `apply` (with `-y`
+   to skip confirmation). It respects what is not yours, makes backups, and
+   resolves secrets exactly like declarative mode.
+2. **It is recorded.** Every ad-hoc resource enters state with
+   `origin: adhoc`. That is why `uninstall` knows exactly what to remove and
+   from where.
+3. **It does not touch `pegboard.yaml`**, unless `--save` is used, which also
+   adds it to the scope's stack. This way a quick experiment becomes
+   declarative with one flag. `pegboard adopt` later promotes all ad-hoc
+   entries to YAML.
+4. **It does not fight declarative mode.** `apply` does not delete ad-hoc
+   entries (they are not its own); `apply --prune-adhoc` does. `drift` lists
+   them separately as "ad-hoc, not declared", without marking them as errors,
+   except with `--strict` (useful in CI).
+5. **Default scope:** `project` if there is a `pegboard.yaml` or a git repo in
+   the current directory; otherwise `global`. It can be forced with `--scope`.
 
 ---
 
-## 5. Providers (agentes)
+## 5. Providers (agents)
 
-Cada provider implementa la misma interfaz:
+Each provider implements the same interface:
 
 ```go
 type Provider interface {
     ID() string
-    Version() int                               // versión del provider, no del agente
-    Detect(env Env, scope Scope) []Target       // ¿está instalado / aplica aquí? (varios: perfiles)
+    Version() int                               // provider version, not the agent's
+    Detect(env Env, scope Scope) []Target       // is it installed / does it apply here? (several: profiles)
 }
 
 type MCPProvider interface {
     Provider
-    MCPFile(t Target) native.File               // archivo, formato y llave contenedora
-    EncodeMCP(m mcp.MCP, enc *Encoder) (*native.Obj, error) // a formato nativo
-    DecodeMCP(v any) (mcp.MCP, error)           // de formato nativo (para import)
+    MCPFile(t Target) native.File               // file, format, and container key
+    EncodeMCP(m mcp.MCP, enc *Encoder) (*native.Obj, error) // to native format
+    DecodeMCP(v any) (mcp.MCP, error)           // from native format (for import)
 }
 ```
 
-`Env` reúne todo lo que el provider consulta de la máquina (home, carpeta del
-proyecto, variables, `PATH`, `--version`), para que los tests corran sobre un
-`t.TempDir()`.
+`Env` gathers everything the provider queries from the machine (home, project
+directory, variables, `PATH`, `--version`), so tests run on a `t.TempDir()`.
 
-Leer, mezclar, planear y escribir no se repite por agente: lo hace
-`internal/engine` sobre los editores de `internal/native`. Un provider solo
-dice dónde viven sus MCPs y cómo se traducen. Los editores solo reescriben la
-llave contenedora (`mcpServers`, `mcp`, `mcp_servers`):
+Reading, merging, planning, and writing are not repeated per agent:
+`internal/engine` does that on top of the `internal/native` editors. A
+provider only says where its MCPs live and how they translate. The editors
+only rewrite the container key (`mcpServers`, `mcp`, `mcp_servers`):
 
-- **JSON:** reemplaza los bytes del valor contenedor; el resto del archivo
-  (p. ej. todo lo demás de `~/.claude.json`) queda byte a byte.
-- **TOML:** cada MCP es una sección `[mcp_servers.<nombre>]`; se reemplaza la
-  sección en su lugar y los comentarios quedan. Un MCP escrito como tabla en
-  línea es conflicto.
-- **YAML:** árbol de nodos de `yaml.v3`; conserva comentarios pero normaliza la
-  indentación a 2 espacios.
+- **JSON:** it replaces the bytes of the container value; the rest of the file
+  (for example, everything else in `~/.claude.json`) stays byte for byte.
+- **TOML:** each MCP is a `[mcp_servers.<name>]` section; the section is
+  replaced in place and comments remain. An MCP written as an inline table is
+  a conflict.
+- **YAML:** `yaml.v3` node tree; it preserves comments but normalizes
+  indentation to 2 spaces.
 
-Un agente se da por instalado si su binario está en el `PATH` o existe su
-carpeta de configuración de usuario. En alcance `project` aplica siempre que
-esté instalado, haya o no archivos en la carpeta todavía.
+An agent is considered installed if its binary is on `PATH` or its user
+config directory exists. In `project` scope it applies whenever it is
+installed, whether or not files exist in the directory yet.
 
-Requisitos de cada provider: tests de ida y vuelta (leer → escribir → leer da
-lo mismo), preservar formato y comentarios cuando el formato lo permita (TOML,
-YAML, JSONC) y escribir de forma atómica con respaldo en
+Requirements for each provider: round-trip tests (read → write → read gives
+the same result), preserving format and comments when the format allows it
+(TOML, YAML, JSONC), and writing atomically with a backup in
 `~/.local/state/pegboard/backups/`.
 
-### Día 1
+### Day one
 
-Rutas a verificar al implementar cada provider; esta tabla es punto de
-partida, no verdad.
+Paths to verify when implementing each provider; this table is a starting
+point, not truth.
 
-| Agente | Binario · carpeta (variable) | MCPs (global / proyecto) | Skills (global / proyecto) | Contexto |
+| Agent | Binary · directory (variable) | MCPs (global / project) | Skills (global / project) | Context |
 |---|---|---|---|---|
-| Claude Code | `claude` · `~/.claude` (`CLAUDE_CONFIG_DIR`) | `~/.claude.json` / `.mcp.json` | `~/.claude/skills/` / `.claude/skills/` | `CLAUDE.md` con `@AGENTS.md` |
-| Codex | `codex` · `~/.codex` (`CODEX_HOME`) | `~/.codex/config.toml` (`[mcp_servers.*]`) / `.codex/config.toml` | `~/.agents/skills/` / `.agents/skills/` | `AGENTS.md` nativo |
-| opencode | `opencode` · `~/.config/opencode` (`XDG_CONFIG_HOME`) | `~/.config/opencode/opencode.json` / `opencode.json` (`mcp`) | `~/.config/opencode/skills/` / `.agents/skills/` | `AGENTS.md` nativo |
-| Hermes | `hermes` · `~/.hermes` (`HERMES_HOME`) | `~/.hermes/config.yaml` (`mcp_servers`) | `~/.hermes/skills/` / `.hermes/skills/`; perfiles en `~/.hermes/profiles/<p>/` | `SOUL.md` |
+| Claude Code | `claude` · `~/.claude` (`CLAUDE_CONFIG_DIR`) | `~/.claude.json` / `.mcp.json` | `~/.claude/skills/` / `.claude/skills/` | `CLAUDE.md` with `@AGENTS.md` |
+| Codex | `codex` · `~/.codex` (`CODEX_HOME`) | `~/.codex/config.toml` (`[mcp_servers.*]`) / `.codex/config.toml` | `~/.agents/skills/` / `.agents/skills/` | native `AGENTS.md` |
+| opencode | `opencode` · `~/.config/opencode` (`XDG_CONFIG_HOME`) | `~/.config/opencode/opencode.json` / `opencode.json` (`mcp`) | `~/.config/opencode/skills/` / `.agents/skills/` | native `AGENTS.md` |
+| Hermes | `hermes` · `~/.hermes` (`HERMES_HOME`) | `~/.hermes/config.yaml` (`mcp_servers`) | `~/.hermes/skills/` / `.hermes/skills/`; profiles in `~/.hermes/profiles/<p>/` | `SOUL.md` |
 
-Las carpetas de skills siguen la tabla de agentes de `npx skills`
-(`docs/agents.md` de vercel-labs/skills 1.7.3). En un proyecto, Codex y
-opencode comparten `.agents/skills/` (la carpeta "universal"): la skill se
-enlaza una sola vez y el plan lo muestra como `codex, opencode · project`.
+Skills directories follow the `npx skills` agent table (`docs/agents.md` from
+vercel-labs/skills 1.7.3). In a project, Codex and opencode share
+`.agents/skills/` (the "universal" directory): the skill is linked only once
+and the plan shows it as `codex, opencode · project`.
 
-Por verificar contra cada agente real: `opencode.jsonc` (hoy solo se escribe
-`opencode.json`); que `CLAUDE_CONFIG_DIR` mueva también `.claude.json`; las
-llaves `env_vars`, `bearer_token_env_var` y `env_http_headers` de Codex; y si
-Hermes interpola variables en `config.yaml` (hoy se asume que no).
+To verify against each real agent: `opencode.jsonc` (today only
+`opencode.json` is written); that `CLAUDE_CONFIG_DIR` also moves
+`.claude.json`; Codex's `env_vars`, `bearer_token_env_var`, and
+`env_http_headers` keys; and whether Hermes interpolates variables in
+`config.yaml` (today it is assumed not to).
 
-Hermes no tiene alcance de proyecto conocido: solo `global` (y por perfil,
-como sub-target `hermes:<perfil>`).
+Hermes has no known project scope: only `global` (and per profile, as the
+`hermes:<profile>` sub-target).
 
-### Después
+### Later
 
-Cursor, Gemini CLI, Pi, Kiro, Copilot CLI… uno por uno, por demanda. Se
-compite en corrección, no en número de agentes.
+Cursor, Gemini CLI, Pi, Kiro, Copilot CLI… one at a time, on demand. The
+competition is on correctness, not on the number of agents.
 
-### Skills: cómo se instalan
+### Skills: how they are installed
 
-Las skills se descargan una vez a un caché (`~/.cache/pegboard/skills/<hash>`) y
-se enlazan (symlink; copia en Windows o si el agente no sigue symlinks) en la
-carpeta de cada agente. Así una skill existe una sola vez en disco y el lock
-garantiza que es la misma en todos lados.
+Skills are downloaded once into a cache (`~/.cache/pegboard/skills/<hash>`)
+and linked (symlink; copy on Windows or if the agent does not follow
+symlinks) into each agent's directory. This way a skill exists only once on
+disk and the lock guarantees it is the same everywhere.
 
-**Fuentes** (las mismas convenciones que `npx skills` y skills.sh, para que un
-repo de skills sirva igual a los dos):
+**Sources** (the same conventions as `npx skills` and skills.sh, so a skills
+repo works the same for both):
 
-| Fuente | Qué es |
+| Source | What it is |
 |---|---|
-| `owner/repo` | todas las skills de un repo de GitHub |
-| `owner/repo@skill` | una sola skill del repo |
-| `github.com/owner/repo//ruta` | host + subcarpeta (estilo go-getter); cualquier host git |
-| `https://github.com/o/r/tree/<ref>/<ruta>` | URL de GitHub o GitLab |
-| `https://…`, `git@…` | cualquier repo git (admite `//ruta`) |
-| `./ruta`, `~/ruta`, `/ruta` | skill local: se enlaza tal cual, sin caché ni lock |
-| `pegboard` | la skill propia (§7), embebida en el binario |
+| `owner/repo` | all skills in a GitHub repo |
+| `owner/repo@skill` | a single skill from the repo |
+| `github.com/owner/repo//path` | host + subdirectory (go-getter style); any git host |
+| `https://github.com/o/r/tree/<ref>/<path>` | GitHub or GitLab URL |
+| `https://…`, `git@…` | any git repo (supports `//path`) |
+| `./path`, `~/path`, `/path` | local skill: linked as-is, without cache or lock |
+| `pegboard` | the built-in skill (§7), embedded in the binary |
 
-Las fuentes git aceptan `?ref=<rama|tag|commit>`. Se descargan con el `git`
-del sistema (`fetch --depth 1`), así que funcionan las credenciales que ya
-tengas para repos privados. El descubrimiento dentro del repo es el de
-`npx skills`: `SKILL.md` en la raíz; si no, `skills/`, `.agents/skills/` y
-`.claude/skills/` hasta tres niveles; si no, todo el árbol. El nombre sale del
-`name:` del frontmatter.
+Git sources accept `?ref=<branch|tag|commit>`. They are downloaded with the
+system `git` (`fetch --depth 1`), so whatever credentials you already have
+for private repos work. Discovery inside the repo is the same as `npx
+skills`: `SKILL.md` at the root; otherwise `skills/`, `.agents/skills/`, and
+`.claude/skills/` up to three levels deep; otherwise the whole tree. The name
+comes from the frontmatter's `name:`.
 
-**Relación con `npx skills`.** No se invoca: pegboard habla el mismo formato
-(fuentes, descubrimiento, carpetas por agente) pero hace la instalación él
-mismo, porque delegarla rompería tres principios. `npx skills` no expone qué
-archivos escribió, así que no habría estado ni drift (principio 2); trae su
-propio lock (`skills-lock.json`), que sería una segunda fuente de verdad; y
-añade una dependencia de Node ≥ 22 a un binario que hoy es único. Lo que sí se
-gana del ecosistema es todo el catálogo: cualquier repo de skills.sh se
-instala igual con `pegboard install skill owner/repo@skill`.
+**Relationship with `npx skills`.** It is not invoked: pegboard speaks the
+same format (sources, discovery, per-agent directories) but performs the
+installation itself, because delegating it would break three principles.
+`npx skills` does not expose which files it wrote, so there would be no state
+and no drift (principle 2); it brings its own lock (`skills-lock.json`),
+which would be a second source of truth; and it adds a Node ≥ 22 dependency
+to a binary that is currently self-contained. What is gained from the
+ecosystem is the whole catalog: any skills.sh repo installs the same way with
+`pegboard install skill owner/repo@skill`.
 
 ---
 
-## 6. Ejemplo de `plan`
+## 6. `plan` example
 
 ```
 $ pegboard plan
@@ -386,160 +393,167 @@ claude-code · project
   + skill mattpocock/tdd (.claude/skills/tdd → cache@a1b2c3)
 codex · project
   + mcp github           (.codex/config.toml)
-  ! mcp notion           editado a mano desde el último apply
+  ! mcp notion           edited manually since the last apply
 hermes · global
-  ~ mcp github           args cambiaron
-Plan: 3 crear, 1 modificar, 0 quitar, 1 conflicto.
+  ~ mcp github           args changed
+Plan: 3 create, 1 update, 0 remove, 1 conflict.
 ```
 
 ---
 
-## 7. Skill para agentes
+## 7. Skill for agents
 
-`pegboard` trae su propia skill (`SKILL.md`), instalable con `pegboard skill install`
-(o declarándola en el stack como cualquier otra). Le enseña al agente a:
+`pegboard` ships its own skill (`SKILL.md`), installable with
+`pegboard skill install` (or by declaring it in the stack like any other). It
+teaches the agent to:
 
-1. Nunca editar `.mcp.json`, `config.toml`, etc. a mano. Para pedidos rápidos
-   ("instálame X"), `pegboard install`; si el proyecto ya tiene
-   `pegboard.yaml`, `pegboard add` / `pegboard remove` o `install --save`.
-2. Siempre correr `pegboard plan --json`, mostrar el resumen al usuario y solo
-   después `pegboard apply -y`.
-3. Ante un conflicto (`!`), preguntar al usuario en lugar de forzar.
-4. Nunca escribir secretos en claro: proponer una referencia `${env:…}`.
+1. Never edit `.mcp.json`, `config.toml`, etc. by hand. For quick requests
+   ("install X for me"), use `pegboard install`; if the project already has a
+   `pegboard.yaml`, use `pegboard add` / `pegboard remove` or `install
+   --save`.
+2. Always run `pegboard plan --json`, show the summary to the user, and only
+   then run `pegboard apply -y`.
+3. On a conflict (`!`), ask the user instead of forcing it.
+4. Never write secrets in plain text: propose a `${env:…}` reference.
 
-Con esto, "agrégame el MCP de Linear en todos mis agentes" cuesta un par de
-tool calls deterministas en lugar de que el agente lea y reescriba cuatro
-formatos distintos.
+With this, "add the Linear MCP to all my agents" costs a couple of
+deterministic tool calls instead of having the agent read and rewrite four
+different formats.
 
-La skill vive en `skill/SKILL.md` y va embebida en el binario: `pegboard skill
-install` la instala en el alcance global de todos los agentes detectados, y
-también puede declararse en un stack como la fuente `pegboard`.
+The skill lives in `skill/SKILL.md` and is embedded in the binary:
+`pegboard skill install` installs it in the global scope of all detected
+agents, `pegboard skill uninstall` removes it from them, and it can also be
+declared in a stack as the `pegboard` source.
 
 ### `context.agents_md`
 
-Solo en un proyecto. Crea `AGENTS.md` si no existe (desde ahí es del usuario:
-pegboard nunca lo borra) y agrega la línea `@AGENTS.md` a `CLAUDE.md` para
-que Claude Code lo lea. Si después se quita `agents_md`, pegboard quita esa
-línea solo si la agregó él.
+Project scope only. It creates `AGENTS.md` if it does not exist (from then on
+it belongs to the user: pegboard never deletes it) and adds the line
+`@AGENTS.md` to `CLAUDE.md` so Claude Code reads it. If `agents_md` is later
+removed, pegboard removes that line only if it added it.
 
-Opcional (fase 4): `pegboard mcp`, un servidor MCP con tools `plan`, `apply`,
-`add`, `drift` para agentes que prefieran tools a shell.
-
----
-
-## 8. Equipos (pull)
-
-`pegboard` no empuja nada a otras máquinas. En un equipo:
-
-1. **Stack en el repo del proyecto.** `pegboard.yaml` + `pegboard.lock` versionados;
-   cada dev clona y corre `pegboard apply`. Como `package.json` + `npm install`.
-2. **Stack de la organización como stack remoto.** El global de cada dev hace
-   `include: github.com/empresa/agent-stack?ref=v3`. Cambiar de versión es
-   decisión de cada quien, viendo el `plan`.
-3. **Políticas como validación.** Un stack puede declarar
-   `policy: { allow_mcps: [github, linear] }`; `plan`/`apply` fallan si el
-   resultado incluye algo fuera de la lista. En CI, `pegboard drift --exit-code`
-   y `pegboard plan --exit-code` revisan que el repo cumpla.
-4. **Flotas.** Si una empresa quiere forzarlo en todas las laptops, usa
-   Ansible, un MDM o los *managed settings* de cada harness para correr
-   `pegboard apply`. `pegboard` es el módulo; ellos, el transporte.
+Optional (phase 4): `pegboard mcp`, an MCP server with `plan`, `apply`, `add`,
+and `drift` tools for agents that prefer tools over a shell.
 
 ---
 
-## 9. Implementación
+## 8. Teams (pull)
 
-- **Lenguaje:** Go. Binario único multiplataforma (Linux, macOS, Windows).
-- **Librerías candidatas:** `cobra` (CLI), `gopkg.in/yaml.v3` y
-  `pelletier/go-toml/v2` (con preservación de formato donde se pueda),
-  `santhosh-tekuri/jsonschema`, Bubble Tea / Lip Gloss (TUI, fase 4).
+`pegboard` does not push anything to other machines. On a team:
+
+1. **Stack in the project repo.** `pegboard.yaml` + `pegboard.lock` are
+   versioned; each developer clones and runs `pegboard apply`. Like
+   `package.json` + `npm install`.
+2. **Organization stack as a remote stack.** Each developer's global stack
+   does `include: github.com/company/agent-stack?ref=v3`. Changing versions
+   is each person's decision, after seeing the `plan`.
+3. **Policies as validation.** A stack can declare
+   `policy: { allow_mcps: [github, linear] }`; `plan`/`apply` fail if the
+   result includes anything outside the list. In CI, `pegboard drift
+   --exit-code` and `pegboard plan --exit-code` check that the repo complies.
+4. **Fleets.** If a company wants to enforce it on every laptop, it uses
+   Ansible, an MDM, or each harness's *managed settings* to run `pegboard
+   apply`. `pegboard` is the module; they are the transport.
+
+---
+
+## 9. Implementation
+
+- **Language:** Go. Single cross-platform binary (Linux, macOS, Windows).
+- **Candidate libraries:** `cobra` (CLI), `gopkg.in/yaml.v3` and
+  `pelletier/go-toml/v2` (preserving format where possible),
+  `santhosh-tekuri/jsonschema`, Bubble Tea / Lip Gloss (TUI, phase 4).
 - **Layout:**
   ```
-  cmd/pegboard/        # entrada CLI
-  internal/stack/      # parseo, schema, mezcla, includes
-  internal/resolve/    # skills/stacks remotos, caché, lock
-  internal/secrets/    # resolución de ${…}
-  internal/state/      # estado y drift
-  internal/plan/       # cálculo y render del plan (texto y JSON)
-  providers/<id>/      # un paquete por agente, con testdata/ de configs reales
-  skill/SKILL.md       # la skill de §7
+  cmd/pegboard/        # CLI entry point
+  internal/stack/      # parsing, schema, merging, includes
+  internal/resolve/    # remote skills/stacks, cache, lock
+  internal/secrets/    # ${…} resolution
+  internal/state/      # state and drift
+  internal/plan/       # plan computation and rendering (text and JSON)
+  providers/<id>/      # one package per agent, with testdata/ of real configs
+  skill/SKILL.md       # the skill from §7
   schema/pegboard.schema.json
   ```
-- **Tests:** golden files por provider con configs reales (incluidas configs
-  "sucias" con cosas ajenas que no deben tocarse). Ningún test escribe fuera
-  de un `t.TempDir()`.
-- **Distribución:** GitHub Releases con goreleaser, Homebrew tap, `go install`.
-- **Tapioca** lo consume como binario: sus tools `apply_stack` y
-  `check_drift` se vuelven llamadas a `pegboard --json`.
+- **Tests:** golden files per provider with real configs (including "dirty"
+  configs with unmanaged content that must not be touched). No test writes
+  outside a `t.TempDir()`.
+- **Distribution:** GitHub Releases with goreleaser, Homebrew tap, `go
+  install`.
+- **Tapioca** consumes it as a binary: its `apply_stack` and `check_drift`
+  tools become calls to `pegboard --json`.
 
 ---
 
-## 10. Fases
+## 10. Phases
 
-Cada fase termina cuando la uso a diario sin frustración.
+Each phase ends when I use it daily without frustration.
 
-### Fase 0 — Esqueleto ✅
-- Repo Go, CI (lint + tests), `pegboard agents` detectando Claude Code, Codex,
-  opencode y Hermes.
-- JSON Schema de `pegboard.yaml`.
-- **Listo cuando:** `pegboard agents` lista bien lo instalado en mi máquina.
+### Phase 0 — Skeleton ✅
+- Go repo, CI (lint + tests), `pegboard agents` detecting Claude Code, Codex,
+  opencode, and Hermes.
+- JSON Schema for `pegboard.yaml`.
+- **Done when:** `pegboard agents` lists what is installed on my machine
+  correctly.
 
-### Fase 1 — MCPs local ✅
-- `init`, `plan`, `apply`, `drift` para MCPs en los 4 providers, alcances
-  global y proyecto. Estado y backups. Secretos `env:` y `file:`.
-- `import` desde cada agente.
-- Modo ad-hoc para MCPs: `install` / `uninstall`, `--save`, `origin: adhoc`
-  en el estado.
-- **Listo cuando:** dejo de editar `.mcp.json` / `config.toml` a mano.
+### Phase 1 — Local MCPs ✅
+- `init`, `plan`, `apply`, `drift` for MCPs across the 4 providers, global and
+  project scopes. State and backups. `env:` and `file:` secrets.
+- `import` from each agent.
+- Ad-hoc mode for MCPs: `install` / `uninstall`, `--save`, `origin: adhoc` in
+  state.
+- **Done when:** I stop editing `.mcp.json` / `config.toml` by hand.
 
-**MVP = fases 0–2**, más releases con goreleaser (`git tag vX.Y.Z` publica
-binarios para Linux, macOS y Windows). Las fases 3 y 4 vienen después.
+**MVP = phases 0–2**, plus goreleaser releases (`git tag vX.Y.Z` publishes
+Linux, macOS, and Windows binaries). Phases 3 and 4 come later.
 
-### Fase 2 — Skills y skill propia ✅
-- Skills locales y de git con caché, symlinks y `pegboard.lock`; `update`.
+### Phase 2 — Skills and the built-in skill ✅
+- Local and git skills with cache, symlinks, and `pegboard.lock`; `update`.
 - `context.agents_md`.
-- `add` / `remove`, `install skill …`, `adopt`, `--json` estable,
-  `pegboard skill install`.
-- **Listo cuando:** le pido a un agente "agrega X a todos" y lo hace con
-  `pegboard` sin equivocarse.
+- `add` / `remove`, `install skill …`, `adopt`, stable `--json`,
+  `pegboard skill install` / `pegboard skill uninstall`.
+- **Done when:** I ask an agent "add X to all of them" and it does it with
+  `pegboard` without mistakes.
 
-### Fase 3 — Stacks remotos y políticas
-- `include` de stacks en git con lock; `policy.allow_mcps`.
-- Secretos `op://` y `keychain:`.
-- `--exit-code` para CI y un ejemplo de GitHub Action.
-- **Listo cuando:** comparto un stack en un repo y otra máquina queda igual
-  con un `pegboard apply`.
+### Phase 3 — Remote stacks and policies
+- `include` of git stacks with a lock; `policy.allow_mcps`.
+- `op://` and `keychain:` secrets.
+- `--exit-code` for CI and a GitHub Action example.
+- **Done when:** I share a stack in a repo and another machine ends up the
+  same with one `pegboard apply`.
 
-### Fase 4 — TUI y extras
-- TUI (Bubble Tea): ver targets, revisar el plan, aplicar.
-- `pegboard mcp` (servidor MCP propio).
-- Más providers según uso.
+### Phase 4 — TUI and extras
+- TUI (Bubble Tea): view targets, review the plan, apply.
+- `pegboard mcp` (pegboard's own MCP server).
+- More providers based on use.
 
-### Después (sin compromiso)
-- UI ligera (o la de Tapioca como primer cliente).
-- Registro de stacks; firmas/verificación de skills.
+### Later (no commitment)
+- Light UI (or Tapioca's as the first client).
+- Stack registry; skill signing/verification.
 
 ---
 
-## 11. Riesgos
+## 11. Risks
 
-- **Los agentes cambian rutas y formatos seguido.** Mitigación: providers
-  versionados, `pegboard agents` muestra la versión detectada del harness, y
-  golden tests con configs reales que se actualizan al detectar cambios.
-- **Preservar comentarios y formato** en JSON/TOML/YAML es difícil; si no se
-  puede, el `plan` lo avisa antes de escribir.
-- **Symlinks en Windows** y agentes que no los siguen: caer a copia y
-  registrarla en el estado.
-- **Secretos en texto plano** cuando el agente no admite referencias: avisar
-  siempre en el `plan`.
-- **Skills de terceros = código de terceros.** El lock fija el contenido
-  exacto; `update` muestra el diff antes de aceptar cambios.
+- **Agents change paths and formats often.** Mitigation: versioned providers,
+  `pegboard agents` shows the detected harness version, and golden tests with
+  real configs are updated when changes are detected.
+- **Preserving comments and format** in JSON/TOML/YAML is hard; if it cannot
+  be done, the `plan` warns before writing.
+- **Symlinks on Windows** and agents that do not follow them: fall back to a
+  copy and record it in state.
+- **Plain-text secrets** when the agent does not support references: always
+  warn in the `plan`.
+- **Third-party skills = third-party code.** The lock pins the exact content;
+  `update` shows the diff before accepting changes.
 
-## 12. Referencias
+## 12. References
 
-- Vecinos: rulesync (https://github.com/dyoshikawa/rulesync), ruler, vsync
+- Neighbors: rulesync (https://github.com/dyoshikawa/rulesync), ruler, vsync
   (https://github.com/nicepkg/vsync), sync-agents-settings
   (https://github.com/Leoyang183/sync-agents-settings), add-mcp (Neon),
   `npx skills` (Vercel).
 - Hermes MCP: https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp
-- Inspiración: Ansible (roles, `--check --diff`), Terraform (plan/state/lock),
-  Jenkins CasC (nombre original del repo), shadow boards del 5S (el nombre).
+- Inspiration: Ansible (roles, `--check --diff`), Terraform
+  (plan/state/lock), Jenkins CasC (the repo's original name), 5S shadow
+  boards (the name).

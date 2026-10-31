@@ -17,26 +17,26 @@ import (
 	"github.com/rmandevs/agents-casc/internal/state"
 )
 
-// Skill es una skill resuelta: su contenido exacto y dónde está en disco.
+// Skill is a resolved skill: its exact content and where it lives on disk.
 type Skill struct {
 	Name   string
-	Source string // la fuente tal como se declaró
-	Dir    string // carpeta en el caché (o la carpeta local)
+	Source string // the source as declared
+	Dir    string // directory in the cache (or the local directory)
 	Hash   string
 	Local  bool
 	Commit string
 }
 
-// Resolver resuelve fuentes a skills en el caché.
+// Resolver resolves sources into skills in the cache.
 type Resolver struct {
 	Cache   string // ~/.cache/pegboard
 	Home    string
-	BaseDir string // las fuentes locales parten de aquí (la carpeta del stack)
-	Lock    *Lock  // nil en modo ad-hoc
-	// Update ignora lo fijado en el lock y vuelve a resolver los refs.
+	BaseDir string // local sources start here (the stack's directory)
+	Lock    *Lock  // nil in ad-hoc mode
+	// Update ignores what the lock pinned and resolves refs again.
 	Update  bool
 	Builtin fs.FS
-	// Git corre git; nil = el binario del sistema.
+	// Git runs git; nil = the system binary.
 	Git func(dir string, args ...string) (string, error)
 }
 
@@ -46,7 +46,7 @@ func (r *Resolver) git(dir string, args ...string) (string, error) {
 	}
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
-	// Nunca esperar una contraseña en la terminal.
+	// Never wait for a password on the terminal.
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -57,7 +57,7 @@ func (r *Resolver) git(dir string, args ...string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// Resolve devuelve las skills de una fuente, ordenadas por nombre.
+// Resolve returns the skills from a source, sorted by name.
 func (r *Resolver) Resolve(src Source) ([]Skill, error) {
 	switch src.Kind {
 	case Local:
@@ -93,7 +93,7 @@ func (r *Resolver) local(src Source) ([]Skill, error) {
 
 func (r *Resolver) builtin(src Source) ([]Skill, error) {
 	if r.Builtin == nil {
-		return nil, errors.New("pegboard: skill propia no disponible")
+		return nil, errors.New("pegboard: built-in skill unavailable")
 	}
 	tmp, err := r.tmp()
 	if err != nil {
@@ -131,15 +131,16 @@ func (r *Resolver) tmp() (string, error) {
 	return os.MkdirTemp(r.Cache, "tmp-")
 }
 
-// CachedDir es la carpeta del caché para un hash (exista o no).
+// CachedDir is the cache directory for a hash (whether it exists or not).
 func (r *Resolver) CachedDir(hash string) string { return r.cached(hash) }
 
-// cached devuelve la carpeta del caché para un hash.
+// cached returns the cache directory for a hash.
 func (r *Resolver) cached(hash string) string {
 	return filepath.Join(r.Cache, "skills", strings.TrimPrefix(hash, "sha256:"))
 }
 
-// store copia dir al caché (si no estaba ya) y devuelve la skill.
+// store copies dir into the cache (if not already there) and returns the
+// skill.
 func (r *Resolver) store(name, source, dir string) (Skill, error) {
 	h, err := Hash(dir)
 	if err != nil {
@@ -177,7 +178,7 @@ func (r *Resolver) fromGit(src Source) ([]Skill, error) {
 			pinned = &l
 		}
 	}
-	// Con lock y todo en el caché, no hace falta red.
+	// With a lock and everything in the cache, no network is needed.
 	if pinned != nil && len(pinned.Skills) > 0 {
 		var out []Skill
 		for _, name := range sortedNames(pinned.Skills) {
@@ -211,7 +212,7 @@ func (r *Resolver) fromGit(src Source) ([]Skill, error) {
 	} {
 		if _, err := r.git(tmp, args...); err != nil {
 			if msg := err.Error(); strings.Contains(msg, "could not read Username") || strings.Contains(msg, "not found") {
-				return nil, fmt.Errorf("%s: no se pudo leer %s: no existe, o es privado y git no tiene credenciales", src.Raw, src.URL)
+				return nil, fmt.Errorf("%s: could not read %s: it does not exist, or it is private and git has no credentials", src.Raw, src.URL)
 			}
 			return nil, fmt.Errorf("%s: %w", src.Raw, err)
 		}
@@ -228,7 +229,7 @@ func (r *Resolver) fromGit(src Source) ([]Skill, error) {
 	if src.Skill != "" {
 		dir, ok := found[src.Skill]
 		if !ok {
-			return nil, fmt.Errorf("%s: el repo no tiene la skill %q (tiene: %s)", src.Raw, src.Skill, strings.Join(sortedNames(found), ", "))
+			return nil, fmt.Errorf("%s: the repository has no skill %q (available: %s)", src.Raw, src.Skill, strings.Join(sortedNames(found), ", "))
 		}
 		found = map[string]string{src.Skill: dir}
 	}
@@ -242,7 +243,7 @@ func (r *Resolver) fromGit(src Source) ([]Skill, error) {
 		sk.Commit = commit
 		if pinned != nil && pinned.Commit == commit {
 			if want, ok := pinned.Skills[name]; ok && want != sk.Hash {
-				return nil, fmt.Errorf("%s: el contenido de %s no coincide con %s (commit %s); revisa con `pegboard update`",
+				return nil, fmt.Errorf("%s: content of %s does not match %s (commit %s); check with `pegboard update`",
 					src.Raw, name, LockFile, Short(commit))
 			}
 		}
@@ -255,16 +256,17 @@ func (r *Resolver) fromGit(src Source) ([]Skill, error) {
 	return out, nil
 }
 
-// Discover busca skills (carpetas con SKILL.md) como lo hace `npx skills`:
-// la raíz, luego skills/, .agents/skills/ y .claude/skills/ hasta tres
-// niveles, y si no hay nada, en todo el árbol. Devuelve nombre → carpeta.
+// Discover finds skills (directories with SKILL.md) the way `npx skills`
+// does: the root, then skills/, .agents/skills/, and .claude/skills/ up to
+// three levels deep, and if nothing is found, the whole tree. It returns
+// name → directory.
 func Discover(root string) (map[string]string, error) {
 	info, err := os.Stat(root)
 	if err != nil {
 		return nil, err
 	}
 	if !info.IsDir() {
-		return nil, fmt.Errorf("%s no es una carpeta", root)
+		return nil, fmt.Errorf("%s is not a directory", root)
 	}
 	found := map[string]string{}
 	add := func(dir string) error {
@@ -273,7 +275,7 @@ func Discover(root string) (map[string]string, error) {
 			return err
 		}
 		if prev, dup := found[name]; dup {
-			return fmt.Errorf("dos skills se llaman %q: %s y %s", name, prev, dir)
+			return fmt.Errorf("two skills are named %q: %s and %s", name, prev, dir)
 		}
 		found[name] = dir
 		return nil
@@ -322,12 +324,13 @@ func Discover(root string) (map[string]string, error) {
 		}
 	}
 	if len(found) == 0 {
-		return nil, fmt.Errorf("no hay ninguna skill (SKILL.md) en %s", root)
+		return nil, fmt.Errorf("no skill (SKILL.md) found in %s", root)
 	}
 	return found, nil
 }
 
-// skillName es el name: del frontmatter de SKILL.md, o el nombre de la carpeta.
+// skillName is the name: field from SKILL.md's frontmatter, or the directory
+// name.
 func skillName(dir string) (string, error) {
 	data, err := os.ReadFile(filepath.Join(dir, "SKILL.md"))
 	if err != nil {
@@ -346,7 +349,7 @@ func skillName(dir string) (string, error) {
 		}
 	}
 	if !nameRe.MatchString(name) {
-		return "", fmt.Errorf("%s: nombre de skill inválido %q", dir, name)
+		return "", fmt.Errorf("%s: invalid skill name %q", dir, name)
 	}
 	return name, nil
 }
@@ -360,10 +363,10 @@ func sortedNames[V any](m map[string]V) []string {
 	return out
 }
 
-// LockFile es el nombre del lock, junto a cada pegboard.yaml (SPEC §3.3).
+// LockFile is the lock name, next to each pegboard.yaml (SPEC §3.3).
 const LockFile = "pegboard.lock"
 
-// Lock fija el commit y el hash de cada skill resuelta.
+// Lock pins the commit and hash of each resolved skill.
 type Lock struct {
 	Version int                     `json:"version"`
 	Sources map[string]LockedSource `json:"skills"`
@@ -372,13 +375,13 @@ type Lock struct {
 	changed bool
 }
 
-// LockedSource es lo fijado para una fuente: su commit y nombre → hash.
+// LockedSource is what was pinned for a source: its commit and name → hash.
 type LockedSource struct {
 	Commit string            `json:"commit,omitempty"`
 	Skills map[string]string `json:"skills"`
 }
 
-// LoadLock lee el lock; si no existe devuelve uno vacío.
+// LoadLock reads the lock; if it does not exist it returns an empty one.
 func LoadLock(path string) (*Lock, error) {
 	l := &Lock{Version: 1, Sources: map[string]LockedSource{}, path: path}
 	data, err := os.ReadFile(path)
@@ -392,7 +395,7 @@ func LoadLock(path string) (*Lock, error) {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	if l.Version != 1 {
-		return nil, fmt.Errorf("%s: versión %d no soportada", path, l.Version)
+		return nil, fmt.Errorf("%s: unsupported version %d", path, l.Version)
 	}
 	if l.Sources == nil {
 		l.Sources = map[string]LockedSource{}
@@ -410,7 +413,7 @@ func (l *Lock) set(source string, ls LockedSource) {
 	l.changed = true
 }
 
-// Prune quita las fuentes que ya no se declaran.
+// Prune removes sources that are no longer declared.
 func (l *Lock) Prune(keep map[string]bool) {
 	for s := range l.Sources {
 		if !keep[s] {
@@ -420,13 +423,13 @@ func (l *Lock) Prune(keep map[string]bool) {
 	}
 }
 
-// Changed informa si hay que escribir el lock.
+// Changed reports whether the lock needs to be written.
 func (l *Lock) Changed() bool { return l.changed }
 
-// Path es la ruta del lock.
+// Path is the lock's path.
 func (l *Lock) Path() string { return l.path }
 
-// Save escribe el lock si cambió.
+// Save writes the lock if it changed.
 func (l *Lock) Save() error {
 	if !l.changed {
 		return nil

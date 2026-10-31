@@ -54,11 +54,11 @@ const claudeJSON = `{
 func TestJSONPreservesOutside(t *testing.T) {
 	d := open(t, File{Format: JSON, Container: "mcpServers"}, claudeJSON)
 	if got := out(t, d); got != claudeJSON {
-		t.Fatalf("sin cambios debía ser idéntico:\n%s", got)
+		t.Fatalf("without changes it should be identical:\n%s", got)
 	}
 	ents, _ := d.Entries()
 	if len(ents) != 1 || ents["mine"] == nil {
-		t.Fatalf("entradas: %v", ents)
+		t.Fatalf("entries: %v", ents)
 	}
 	if err := d.Set("github", github()); err != nil {
 		t.Fatal(err)
@@ -110,14 +110,14 @@ func TestJSONAddContainer(t *testing.T) {
 	d = open(t, File{Format: JSON, Container: "mcpServers"}, "{}")
 	_ = d.Set("x", NewObj().Set("url", "https://x"))
 	if got := out(t, d); !strings.HasPrefix(got, "{\n  \"mcpServers\": {") {
-		t.Fatalf("objeto vacío:\n%s", got)
+		t.Fatalf("empty object:\n%s", got)
 	}
 }
 
 func TestJSONNewFileWithSkeleton(t *testing.T) {
 	d := open(t, File{Format: JSON, Container: "mcp", Skeleton: NewObj().Set("$schema", "https://opencode.ai/config.json")}, "")
 	if d.Exists() {
-		t.Fatal("no debía existir")
+		t.Fatal("it should not exist")
 	}
 	_ = d.Set("x", NewObj().Set("type", "remote"))
 	want := "{\n  \"$schema\": \"https://opencode.ai/config.json\",\n  \"mcp\": {\n    \"x\": {\n      \"type\": \"remote\"\n    }\n  }\n}\n"
@@ -131,22 +131,22 @@ func TestJSONErrors(t *testing.T) {
 	for _, c := range []string{"[1]", "{\"mcpServers\": [1]}", "{} {}", "{"} {
 		_ = os.WriteFile(f.Path, []byte(c), 0o600)
 		if _, err := Open(f); err == nil {
-			t.Errorf("%q debía fallar", c)
+			t.Errorf("%q should fail", c)
 		}
 	}
 }
 
-const codexTOML = `# Mi config de Codex
+const codexTOML = `# My Codex config
 model = "o4"
 
 [mcp_servers.github]
 command = "old"
-# comentario dentro
+# comment inside
 
 [mcp_servers.github.env]
 A = "1"
 
-[mcp_servers.otro] # ajeno
+[mcp_servers.other] # unmanaged
 command = "x"
 
 [profiles.dev]
@@ -157,12 +157,12 @@ func TestTOMLReplaceInPlace(t *testing.T) {
 	d := open(t, File{Format: TOML, Container: "mcp_servers"}, codexTOML)
 	ents, _ := d.Entries()
 	if Str(ents["github"].(map[string]any), "command") != "old" || len(ents) != 2 {
-		t.Fatalf("entradas: %v", ents)
+		t.Fatalf("entries: %v", ents)
 	}
 	if err := d.Set("github", github()); err != nil {
 		t.Fatal(err)
 	}
-	want := `# Mi config de Codex
+	want := `# My Codex config
 model = "o4"
 
 [mcp_servers.github]
@@ -170,7 +170,7 @@ command = "npx"
 args = ["-y", "srv"]
 env = { TOKEN = "${TOKEN}" }
 
-[mcp_servers.otro] # ajeno
+[mcp_servers.other] # unmanaged
 command = "x"
 
 [profiles.dev]
@@ -179,25 +179,25 @@ model = "o3"
 	if got := out(t, d); got != want {
 		t.Fatalf("got:\n%s", got)
 	}
-	_ = d.Set("nuevo.srv", NewObj().Set("url", "https://x"))
-	if got := out(t, d); !strings.HasSuffix(got, "model = \"o3\"\n\n[mcp_servers.\"nuevo.srv\"]\nurl = \"https://x\"\n") {
-		t.Fatalf("agregar:\n%s", got)
+	_ = d.Set("new.srv", NewObj().Set("url", "https://x"))
+	if got := out(t, d); !strings.HasSuffix(got, "model = \"o3\"\n\n[mcp_servers.\"new.srv\"]\nurl = \"https://x\"\n") {
+		t.Fatalf("add:\n%s", got)
 	}
-	_ = d.Delete("otro")
-	_ = d.Delete("nuevo.srv")
+	_ = d.Delete("other")
+	_ = d.Delete("new.srv")
 	got := out(t, d)
-	if strings.Contains(got, "otro") || strings.Contains(got, "nuevo") || !strings.Contains(got, "[profiles.dev]") {
-		t.Fatalf("quitar:\n%s", got)
+	if strings.Contains(got, "other") || strings.Contains(got, "new") || !strings.Contains(got, "[profiles.dev]") {
+		t.Fatalf("remove:\n%s", got)
 	}
 }
 
 func TestTOMLUnsupported(t *testing.T) {
 	d := open(t, File{Format: TOML, Container: "mcp_servers"}, "[mcp_servers]\ngithub = { command = \"x\" }\n")
 	if err := d.Set("github", github()); !errors.Is(err, ErrUnsupported) {
-		t.Fatalf("esperaba ErrUnsupported, fue %v", err)
+		t.Fatalf("expected ErrUnsupported, got %v", err)
 	}
-	if err := d.Set("otro", github()); err != nil {
-		t.Fatalf("otro MCP sí debía poder agregarse: %v", err)
+	if err := d.Set("other", github()); err != nil {
+		t.Fatalf("another MCP should be addable: %v", err)
 	}
 }
 
@@ -209,10 +209,10 @@ func TestTOMLNewFile(t *testing.T) {
 	}
 }
 
-const hermesYAML = `# Config de Hermes
+const hermesYAML = `# Hermes config
 model: nous/hermes-4
 mcp_servers:
-  # el mío
+  # mine
   local:
     command: uvx
     args: [srv]
@@ -223,18 +223,18 @@ toolsets:
 func TestYAMLKeepsComments(t *testing.T) {
 	d := open(t, File{Format: YAML, Container: "mcp_servers"}, hermesYAML)
 	if got := out(t, d); got != hermesYAML {
-		t.Fatal("sin cambios debía ser idéntico")
+		t.Fatal("without changes it should be identical")
 	}
 	_ = d.Set("github", github())
 	got := out(t, d)
-	for _, want := range []string{"# Config de Hermes", "# el mío", "toolsets:", "  github:\n    command: npx\n    args:\n      - -y\n      - srv\n    env:\n      TOKEN: ${TOKEN}\n"} {
+	for _, want := range []string{"# Hermes config", "# mine", "toolsets:", "  github:\n    command: npx\n    args:\n      - -y\n      - srv\n    env:\n      TOKEN: ${TOKEN}\n"} {
 		if !strings.Contains(got, want) {
-			t.Errorf("falta %q en:\n%s", want, got)
+			t.Errorf("missing %q in:\n%s", want, got)
 		}
 	}
 	_ = d.Delete("local")
 	if got := out(t, d); strings.Contains(got, "uvx") {
-		t.Errorf("no quitó local:\n%s", got)
+		t.Errorf("it did not remove local:\n%s", got)
 	}
 }
 
@@ -255,14 +255,14 @@ func TestYAMLNewAndNull(t *testing.T) {
 }
 
 func TestHashMasks(t *testing.T) {
-	a := NewObj().Set("env", StringMap(map[string]string{"T": "secreto1"}))
-	b := NewObj().Set("env", StringMap(map[string]string{"T": "secreto2"}))
+	a := NewObj().Set("env", StringMap(map[string]string{"T": "secret1"}))
+	b := NewObj().Set("env", StringMap(map[string]string{"T": "secret2"}))
 	m := []string{Pointer("env", "T")}
 	if Hash(a, m) != Hash(b, m) {
-		t.Error("el hash no debía depender del secreto")
+		t.Error("the hash should not depend on the secret")
 	}
 	if Hash(a, nil) == Hash(b, nil) {
-		t.Error("sin máscara los hashes debían diferir")
+		t.Error("without masking the hashes should differ")
 	}
 	if Pointer("a/b", "c~d") != "/a~1b/c~0d" || len(splitPointer("/a~1b/c~0d")) != 2 {
 		t.Error("pointer")

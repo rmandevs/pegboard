@@ -17,14 +17,14 @@ import (
 	"github.com/rmandevs/agents-casc/skill"
 )
 
-// scopeCtx es todo lo cargado para un alcance.
+// scopeCtx is everything loaded for a scope.
 type scopeCtx struct {
 	scope   agent.Scope
-	stack   *stack.Stack // nil si no hay pegboard.yaml
+	stack   *stack.Stack // nil if there is no pegboard.yaml
 	state   *state.State
-	targets []agent.Target // detectados y filtrados por --agent
+	targets []agent.Target // detected and filtered by --agent
 	env     agent.Env
-	lock    *skills.Lock // nil si no hay stack
+	lock    *skills.Lock // nil if there is no stack
 }
 
 func statePath(env agent.Env, scope agent.Scope) string {
@@ -34,7 +34,7 @@ func statePath(env agent.Env, scope agent.Scope) string {
 	return filepath.Join(env.ProjectDir, ".pegboard", "state.json")
 }
 
-// load carga stack, estado y targets de cada alcance.
+// load loads the stack, state, and targets for each scope.
 func (o *options) load(env agent.Env, scopes []agent.Scope, provs []agent.Provider) ([]*scopeCtx, error) {
 	var out []*scopeCtx
 	for _, sc := range scopes {
@@ -89,7 +89,7 @@ func (c *scopeCtx) hasDeclared() bool {
 	return len(c.state.Context) > 0
 }
 
-// skillResolver resuelve fuentes de skills de este alcance.
+// skillResolver resolves skill sources for this scope.
 func (c *scopeCtx) skillResolver(lock *skills.Lock) *skills.Resolver {
 	return &skills.Resolver{
 		Cache:   c.env.CacheDir(),
@@ -100,8 +100,8 @@ func (c *scopeCtx) skillResolver(lock *skills.Lock) *skills.Resolver {
 	}
 }
 
-// resolveSkills resuelve una lista de fuentes; dos skills con el mismo
-// nombre son un error.
+// resolveSkills resolves a list of sources; two skills with the same name
+// are an error.
 func resolveSkills(r *skills.Resolver, sources []string) ([]skills.Skill, error) {
 	var out []skills.Skill
 	from := map[string]string{}
@@ -116,7 +116,7 @@ func resolveSkills(r *skills.Resolver, sources []string) ([]skills.Skill, error)
 		}
 		for _, sk := range got {
 			if prev, dup := from[sk.Name]; dup {
-				return nil, fmt.Errorf("la skill %q viene de dos fuentes: %s y %s", sk.Name, prev, raw)
+				return nil, fmt.Errorf("skill %q comes from two sources: %s and %s", sk.Name, prev, raw)
 			}
 			from[sk.Name] = raw
 			out = append(out, sk)
@@ -125,9 +125,9 @@ func resolveSkills(r *skills.Resolver, sources []string) ([]skills.Skill, error)
 	return out, nil
 }
 
-// skillDirs agrupa los targets por carpeta de skills (Codex y opencode
-// comparten .agents/skills en un proyecto). want da las skills de cada
-// target; drop decide si una entrada del estado que ya no se quiere se quita.
+// skillDirs groups targets by skills directory (Codex and opencode share
+// .agents/skills in a project). want gives each target's skills; drop
+// decides whether an unwanted state entry is removed.
 func (c *scopeCtx) skillDirs(want func(agent.Target) map[string]*engine.SkillWant, drop func(state.SkillEntry) bool) []engine.SkillDir {
 	var order []string
 	byDir := map[string]*engine.SkillDir{}
@@ -167,13 +167,13 @@ func (c *scopeCtx) skillDirs(want func(agent.Target) map[string]*engine.SkillWan
 
 const agentsMDTemplate = `# AGENTS.md
 
-Instrucciones para los agentes que trabajan en este proyecto (Codex, opencode
-y Claude Code vía @AGENTS.md en CLAUDE.md).
+Instructions for the agents that work in this project (Codex, opencode, and
+Claude Code via @AGENTS.md in CLAUDE.md).
 `
 
-// declarativeScopes elige los alcances de plan/apply: el de --scope, o los
-// que tienen pegboard.yaml (o estado declarado que limpiar). Un proyecto con
-// inherit: none excluye el global.
+// declarativeScopes chooses the scopes for plan/apply: the one from --scope,
+// or those that have pegboard.yaml (or declared state to clean up). A
+// project with inherit: none excludes the global scope.
 func (o *options) declarativeScopes(env agent.Env) ([]*scopeCtx, error) {
 	scopes, provs, err := o.selection()
 	if err != nil {
@@ -202,13 +202,13 @@ func (o *options) declarativeScopes(env agent.Env) ([]*scopeCtx, error) {
 		}
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("no hay %s aquí ni global; corre `pegboard init` o usa `pegboard install`", stack.FileName)
+		return nil, fmt.Errorf("no %s here or globally; run `pegboard init` or use `pegboard install`", stack.FileName)
 	}
 	return out, nil
 }
 
-// mcpProvider devuelve el provider de MCPs del target, si el target tiene
-// archivo de MCPs (Hermes en un proyecto, por ejemplo, no tiene).
+// mcpProvider returns the target's MCP provider, if the target has an MCP
+// file (Hermes in a project, for example, does not).
 func mcpProvider(t agent.Target) (agent.MCPProvider, bool) {
 	if t.Paths.MCPs == "" {
 		return nil, false
@@ -225,13 +225,13 @@ func mcpProviderByID(id string) (agent.MCPProvider, bool) {
 	return mp, ok
 }
 
-// declarative arma el engine.Scope de un alcance a partir de su stack.
-// Devuelve también los avisos (agentes listados no detectados, fases
-// futuras) y qué hacer después de aplicar (guardar el lock).
+// declarative builds the engine.Scope for a scope from its stack. It also
+// returns warnings (listed agents not detected, future phases) and what to
+// do after applying (save the lock).
 func (c *scopeCtx) declarative(pruneAdhoc bool) (engine.Scope, []string, func() error, error) {
-	es, warnings, err := c.declarativeMCPs(pruneAdhoc)
+	engScope, warnings, err := c.declarativeMCPs(pruneAdhoc)
 	if err != nil {
-		return es, warnings, nil, err
+		return engScope, warnings, nil, err
 	}
 	var listed []string
 	var declared []string
@@ -245,7 +245,7 @@ func (c *scopeCtx) declarative(pruneAdhoc bool) (engine.Scope, []string, func() 
 	lock := c.lock
 	resolved, err := resolveSkills(c.skillResolver(lock), declared)
 	if err != nil {
-		return es, warnings, nil, err
+		return engScope, warnings, nil, err
 	}
 	wants := map[string]*engine.SkillWant{}
 	for _, sk := range resolved {
@@ -253,7 +253,7 @@ func (c *scopeCtx) declarative(pruneAdhoc bool) (engine.Scope, []string, func() 
 			wants[sk.Name] = &engine.SkillWant{Skill: sk, Origin: state.Declared}
 		}
 	}
-	es.Skills = c.skillDirs(func(t agent.Target) map[string]*engine.SkillWant {
+	engScope.Skills = c.skillDirs(func(t agent.Target) map[string]*engine.SkillWant {
 		if !selected(t) {
 			return nil
 		}
@@ -261,16 +261,16 @@ func (c *scopeCtx) declarative(pruneAdhoc bool) (engine.Scope, []string, func() 
 	}, func(e state.SkillEntry) bool { return e.Origin == state.Declared || pruneAdhoc })
 
 	if c.scope == agent.Global && agentsMD {
-		warnings = append(warnings, c.stack.Path+": context.agents_md solo aplica en un proyecto; se ignora")
+		warnings = append(warnings, c.stack.Path+": context.agents_md only applies in a project; ignoring it")
 	}
 	if c.scope == agent.Project && (agentsMD || len(c.state.Context) > 0) {
-		es.Context = append(es.Context, engine.ContextFile{
-			Path: filepath.Join(c.env.ProjectDir, "AGENTS.md"), Target: "proyecto",
+		engScope.Context = append(engScope.Context, engine.ContextFile{
+			Path: filepath.Join(c.env.ProjectDir, "AGENTS.md"), Target: "agents.md",
 			Template: agentsMDTemplate, Want: agentsMD,
 		})
 		for _, t := range c.targets {
 			if t.Agent == "claude-code" && t.Paths.Context != "" {
-				es.Context = append(es.Context, engine.ContextFile{
+				engScope.Context = append(engScope.Context, engine.ContextFile{
 					Path: t.Paths.Context, Target: t.ID(), Line: "@AGENTS.md", Want: agentsMD && selected(t),
 				})
 			}
@@ -287,12 +287,12 @@ func (c *scopeCtx) declarative(pruneAdhoc bool) (engine.Scope, []string, func() 
 		lock.Prune(keep)
 		return lock.Save()
 	}
-	return es, warnings, after, nil
+	return engScope, warnings, after, nil
 }
 
-// declarativeMCPs arma la parte de MCPs del alcance.
+// declarativeMCPs builds the MCP part of the scope.
 func (c *scopeCtx) declarativeMCPs(pruneAdhoc bool) (engine.Scope, []string, error) {
-	es := engine.Scope{Scope: c.scope, State: c.state, Resolver: c.resolver()}
+	engScope := engine.Scope{Scope: c.scope, State: c.state, Resolver: c.resolver()}
 	var warnings []string
 	desired := map[string]mcp.MCP{}
 	var listed []string
@@ -300,7 +300,7 @@ func (c *scopeCtx) declarativeMCPs(pruneAdhoc bool) (engine.Scope, []string, err
 		var err error
 		desired, warnings, err = c.stack.Desired()
 		if err != nil {
-			return es, warnings, err
+			return engScope, warnings, err
 		}
 		listed = c.stack.Agents
 		for _, a := range listed {
@@ -311,7 +311,7 @@ func (c *scopeCtx) declarativeMCPs(pruneAdhoc bool) (engine.Scope, []string, err
 				}
 			}
 			if !found {
-				warnings = append(warnings, fmt.Sprintf("%s · %s: no detectado; se omite", a, c.scope))
+				warnings = append(warnings, fmt.Sprintf("%s · %s: not detected; skipping", a, c.scope))
 			}
 		}
 	}
@@ -339,10 +339,10 @@ func (c *scopeCtx) declarativeMCPs(pruneAdhoc bool) (engine.Scope, []string, err
 			}
 		}
 		if len(wants) > 0 {
-			es.Targets = append(es.Targets, engine.Target{Target: t, Provider: p, Wants: wants})
+			engScope.Targets = append(engScope.Targets, engine.Target{Target: t, Provider: p, Wants: wants})
 		}
 	}
-	return es, warnings, nil
+	return engScope, warnings, nil
 }
 
 func targetIDs(ts []agent.Target) string {
@@ -354,7 +354,7 @@ func targetIDs(ts []agent.Target) string {
 	return strings.Join(ids, ", ")
 }
 
-// providersDetectAll detecta todos los agentes del alcance, sin --agent.
+// providersDetectAll detects all agents in the scope, without --agent.
 func providersDetectAll(env agent.Env, scope agent.Scope) []agent.Target {
 	return providers.Detect(env, providers.All(), []agent.Scope{scope})
 }

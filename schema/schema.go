@@ -1,4 +1,4 @@
-// Package schema publica y aplica el JSON Schema de pegboard.yaml.
+// Package schema publishes and applies the pegboard.yaml JSON Schema.
 package schema
 
 import (
@@ -29,17 +29,17 @@ var compiled = sync.OnceValues(func() (*jsonschema.Schema, error) {
 	return c.Compile(url)
 })
 
-// ValidateYAML valida el contenido de un pegboard.yaml contra el schema.
+// ValidateYAML validates the contents of a pegboard.yaml against the schema.
 func ValidateYAML(src []byte) error {
 	var v any
 	if err := yaml.Unmarshal(src, &v); err != nil {
-		return fmt.Errorf("YAML inválido: %w", err)
+		return fmt.Errorf("invalid YAML: %w", err)
 	}
-	// YAML → JSON → modelo de jsonschema: así los tipos (enteros, mapas
-	// con llaves no string) quedan como los vería un validador de editor.
+	// YAML → JSON → jsonschema model: this way types (integers, maps with
+	// non-string keys) look the way an editor validator would see them.
 	j, err := json.Marshal(v)
 	if err != nil {
-		return fmt.Errorf("YAML no representable como JSON: %w", err)
+		return fmt.Errorf("YAML is not representable as JSON: %w", err)
 	}
 	inst, err := jsonschema.UnmarshalJSON(bytes.NewReader(j))
 	if err != nil {
@@ -47,7 +47,7 @@ func ValidateYAML(src []byte) error {
 	}
 	s, err := compiled()
 	if err != nil {
-		return fmt.Errorf("schema interno inválido: %w", err)
+		return fmt.Errorf("invalid internal schema: %w", err)
 	}
 	return s.Validate(inst)
 }

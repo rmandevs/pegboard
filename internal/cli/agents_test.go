@@ -9,7 +9,7 @@ import (
 	"github.com/rmandevs/agents-casc/internal/agent/agenttest"
 )
 
-// stdin es lo que lee la confirmación de apply; los tests lo cambian.
+// stdin is what apply's confirmation reads; tests change it.
 var stdin = ""
 
 func run(m *agenttest.Machine, args ...string) (string, string, int) {
@@ -21,7 +21,7 @@ func run(m *agenttest.Machine, args ...string) (string, string, int) {
 func TestAgentsNone(t *testing.T) {
 	m := agenttest.New(t)
 	out, _, code := run(m, "agents")
-	if code != 0 || !strings.Contains(out, "No se detectó") {
+	if code != 0 || !strings.Contains(out, "No agents detected") {
 		t.Errorf("code=%d out=%q", code, out)
 	}
 	out, _, _ = run(m, "agents", "--json")
@@ -30,7 +30,7 @@ func TestAgentsNone(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got.Targets == nil || len(got.Targets) != 0 {
-		t.Errorf("targets debía ser [] y no null: %s", out)
+		t.Errorf("targets should be [] and not null: %s", out)
 	}
 }
 
@@ -50,17 +50,17 @@ func TestAgentsText(t *testing.T) {
 	}
 	for _, want := range []string{
 		"claude-code · global  (v2.1.3, provider v1)",
-		"mcps:       ~/.claude.json  (no existe)",
-		"hermes:work · global  (versión desconocida, provider v1)",
+		"mcps:       ~/.claude.json  (does not exist)",
+		"hermes:work · global  (unknown version, provider v1)",
 		"claude-code · project",
 		"mcps:       .mcp.json\n",
 	} {
 		if !strings.Contains(out, want) {
-			t.Errorf("falta %q en:\n%s", want, out)
+			t.Errorf("missing %q in:\n%s", want, out)
 		}
 	}
 	if strings.Contains(out, "hermes:work · project") || strings.Contains(out, "codex") {
-		t.Errorf("targets de más:\n%s", out)
+		t.Errorf("extra targets:\n%s", out)
 	}
 }
 
@@ -77,13 +77,13 @@ func TestAgentsJSONFilters(t *testing.T) {
 		t.Errorf("%+v", got.Targets)
 	}
 	if !strings.Contains(out, `"provider_version": 1`) || !strings.Contains(out, `"scope": "global"`) {
-		t.Errorf("formato JSON:\n%s", out)
+		t.Errorf("JSON format:\n%s", out)
 	}
 }
 
 func TestAgentsErrors(t *testing.T) {
 	m := agenttest.New(t)
-	if _, errOut, code := run(m, "agents", "--scope", "todo"); code != 1 || !strings.Contains(errOut, "--scope") {
+	if _, errOut, code := run(m, "agents", "--scope", "all"); code != 1 || !strings.Contains(errOut, "--scope") {
 		t.Errorf("code=%d err=%q", code, errOut)
 	}
 	if _, errOut, code := run(m, "agents", "--agent", "cursor"); code != 1 || !strings.Contains(errOut, `"cursor"`) {

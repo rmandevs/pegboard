@@ -1,6 +1,6 @@
-// Package native trabaja con la config nativa de los agentes: árboles de
-// valores (lo que hay bajo mcpServers, mcp_servers…) y los archivos JSON,
-// TOML y YAML que los contienen, editados sin tocar lo ajeno.
+// Package native works with the agents' native config: value trees (what is
+// under mcpServers, mcp_servers…) and the JSON, TOML, and YAML files that
+// contain them, edited without touching anything else.
 package native
 
 import (
@@ -13,8 +13,8 @@ import (
 	"strings"
 )
 
-// Obj es un objeto con orden de llaves, para escribir las entradas como las
-// escribiría una persona (command antes que args).
+// Obj is an object with key order, so entries are written the way a person
+// would write them (command before args).
 type Obj struct {
 	Keys []string
 	Vals map[string]any
@@ -22,7 +22,7 @@ type Obj struct {
 
 func NewObj() *Obj { return &Obj{Vals: map[string]any{}} }
 
-// Set agrega o reemplaza una llave, conservando su posición si ya estaba.
+// Set adds or replaces a key, keeping its position if it was already there.
 func (o *Obj) Set(k string, v any) *Obj {
 	if _, ok := o.Vals[k]; !ok {
 		o.Keys = append(o.Keys, k)
@@ -31,7 +31,7 @@ func (o *Obj) Set(k string, v any) *Obj {
 	return o
 }
 
-// SetIf hace Set solo si v no está vacío ("" , lista o mapa vacíos).
+// SetIf calls Set only if v is not empty ("", empty list, or empty map).
 func (o *Obj) SetIf(k string, v any) *Obj {
 	switch x := v.(type) {
 	case string:
@@ -54,7 +54,7 @@ func (o *Obj) SetIf(k string, v any) *Obj {
 	return o.Set(k, v)
 }
 
-// StringMap convierte un mapa en Obj con llaves ordenadas.
+// StringMap converts a map into an Obj with sorted keys.
 func StringMap(m map[string]string) *Obj {
 	o := NewObj()
 	for _, k := range sortedKeys(m) {
@@ -86,7 +86,8 @@ func (o *Obj) MarshalJSON() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// marshal es json.Marshal sin escapar <, > y & (los agentes no lo hacen).
+// marshal is json.Marshal without escaping <, >, and & (the agents do not
+// escape them either).
 func marshal(v any) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
@@ -97,8 +98,8 @@ func marshal(v any) ([]byte, error) {
 	return bytes.TrimRight(buf.Bytes(), "\n"), nil
 }
 
-// Plain lleva cualquier árbol (Obj, mapas de TOML o YAML, enteros…) a la
-// forma de encoding/json, para compararlos sin importar de dónde vienen.
+// Plain converts any tree (Obj, TOML or YAML maps, integers…) to the
+// encoding/json shape, so they can be compared regardless of origin.
 func Plain(v any) any {
 	b, err := marshal(v)
 	if err != nil {
@@ -111,21 +112,21 @@ func Plain(v any) any {
 	return out
 }
 
-// Canonical es la serialización estable de un árbol (llaves ordenadas).
+// Canonical is the stable serialization of a tree (sorted keys).
 func Canonical(v any) string {
 	b, _ := marshal(Plain(v))
 	return string(b)
 }
 
-// Equal compara dos árboles por su forma canónica.
+// Equal compares two trees by their canonical form.
 func Equal(a, b any) bool { return Canonical(a) == Canonical(b) }
 
-// Masked es el texto que reemplaza a un secreto antes de calcular un hash.
-const Masked = "<secreto>"
+// Masked is the text that replaces a secret before computing a hash.
+const Masked = "<secret>"
 
-// Hash es el sha256 de la forma canónica, con los valores en masked (rutas
-// tipo JSON pointer: /env/TOKEN) reemplazados: así el estado nunca depende
-// de un secreto en claro.
+// Hash is the sha256 of the canonical form, with the values at masked paths
+// (JSON pointer style: /env/TOKEN) replaced: this way the state never
+// depends on a secret in plain text.
 func Hash(v any, masked []string) string {
 	p := Plain(v)
 	for _, path := range masked {
@@ -152,7 +153,7 @@ func mask(v any, path []string) any {
 	return v
 }
 
-// Pointer arma una ruta tipo JSON pointer (RFC 6901).
+// Pointer builds a JSON pointer path (RFC 6901).
 func Pointer(parts ...string) string {
 	var b strings.Builder
 	for _, p := range parts {
@@ -182,15 +183,15 @@ func sortedKeys[V any](m map[string]V) []string {
 	return keys
 }
 
-// Helpers para leer árboles Plain al decodificar entradas nativas.
+// Helpers for reading Plain trees when decoding native entries.
 
-// Str devuelve m[k] si es string.
+// Str returns m[k] if it is a string.
 func Str(m map[string]any, k string) string {
 	s, _ := m[k].(string)
 	return s
 }
 
-// Strs devuelve m[k] si es una lista de strings.
+// Strs returns m[k] if it is a list of strings.
 func Strs(m map[string]any, k string) []string {
 	l, _ := m[k].([]any)
 	var out []string
@@ -202,7 +203,7 @@ func Strs(m map[string]any, k string) []string {
 	return out
 }
 
-// StrMap devuelve m[k] si es un objeto de strings.
+// StrMap returns m[k] if it is an object of strings.
 func StrMap(m map[string]any, k string) map[string]string {
 	o, _ := m[k].(map[string]any)
 	if len(o) == 0 {

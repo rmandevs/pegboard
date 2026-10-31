@@ -1,5 +1,5 @@
 version: 1
-agents: [hermes:trabajo, claude-code]
+agents: [hermes:work, claude-code]
 mcps:
   linear:
     url: https://mcp.linear.app/mcp

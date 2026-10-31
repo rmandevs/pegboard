@@ -18,8 +18,8 @@ func (Provider) MCPFile(t agent.Target) native.File {
 	}
 }
 
-// opencode sustituye {env:X} y {file:ruta} en cualquier string de su config.
-// Las rutas se escriben absolutas: opencode las resolvería desde su archivo.
+// opencode substitutes {env:X} and {file:path} in any string in its config.
+// Paths are written absolute: opencode would resolve them from its own file.
 func (Provider) EncodeMCP(m mcp.MCP, enc *agent.Encoder) (*native.Obj, error) {
 	enc.Native = func(r secrets.Ref) (string, bool) {
 		switch r.Kind {

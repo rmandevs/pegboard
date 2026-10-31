@@ -1,4 +1,4 @@
-// Package providers registra los providers disponibles.
+// Package providers registers the available providers.
 package providers
 
 import (
@@ -11,7 +11,7 @@ import (
 	"github.com/rmandevs/agents-casc/providers/opencode"
 )
 
-// All son los providers en el orden en que se muestran.
+// All lists the providers in display order.
 func All() []agent.Provider {
 	return []agent.Provider{
 		claudecode.Provider{},
@@ -21,7 +21,7 @@ func All() []agent.Provider {
 	}
 }
 
-// Get busca un provider por ID.
+// Get looks up a provider by ID.
 func Get(id string) (agent.Provider, bool) {
 	for _, p := range All() {
 		if p.ID() == id {
@@ -31,9 +31,9 @@ func Get(id string) (agent.Provider, bool) {
 	return nil, false
 }
 
-// Detect corre la detección de los providers dados en paralelo (cada uno
-// puede invocar `--version`) y devuelve los targets en orden estable:
-// por alcance y luego por provider.
+// Detect runs provider detection in parallel (each one may invoke
+// `--version`) and returns targets in stable order: by scope, then by
+// provider.
 func Detect(env agent.Env, provs []agent.Provider, scopes []agent.Scope) []agent.Target {
 	results := make([][]agent.Target, len(provs)*len(scopes))
 	var wg sync.WaitGroup
@@ -54,7 +54,7 @@ func Detect(env agent.Env, provs []agent.Provider, scopes []agent.Scope) []agent
 	return out
 }
 
-// Compile-time: los cuatro providers manejan MCPs.
+// Compile-time check: all four providers handle MCPs.
 var (
 	_ agent.MCPProvider = claudecode.Provider{}
 	_ agent.MCPProvider = codex.Provider{}

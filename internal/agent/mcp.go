@@ -8,34 +8,36 @@ import (
 	"github.com/rmandevs/agents-casc/internal/secrets"
 )
 
-// MCPProvider es la parte de Provider que maneja MCPs: dónde viven y cómo se
-// traducen. Leer, mezclar y escribir es común a todos (internal/engine).
+// MCPProvider is the part of Provider that handles MCPs: where they live and
+// how they are translated. Reading, merging, and writing are shared by all
+// providers (internal/engine).
 type MCPProvider interface {
 	Provider
-	// MCPFile es el archivo de MCPs del target.
+	// MCPFile is the target's MCP file.
 	MCPFile(t Target) native.File
-	// EncodeMCP traduce un MCP al formato nativo, resolviendo secretos con r
-	// cuando el agente no admite referencias. Las rutas de enc.Masked
-	// quedaron con un secreto en claro.
+	// EncodeMCP translates an MCP into the native format, resolving secrets
+	// with r when the agent does not support references. The paths in
+	// enc.Masked ended up with a secret in plain text.
 	EncodeMCP(m mcp.MCP, enc *Encoder) (*native.Obj, error)
-	// DecodeMCP lee una entrada nativa (forma Plain) y lleva las referencias
-	// nativas a ${env:…} / ${file:…}.
+	// DecodeMCP reads a native entry (Plain shape) and converts native
+	// references to ${env:…} / ${file:…}.
 	DecodeMCP(v any) (mcp.MCP, error)
 }
 
-// Encoder expande strings con secretos y anota dónde quedaron en claro.
+// Encoder expands strings with secrets and records where they ended up in
+// plain text.
 type Encoder struct {
 	Resolver secrets.Resolver
-	// Native traduce referencias a la sintaxis del agente; nil = ninguna.
+	// Native translates references to the agent's syntax; nil = none.
 	Native secrets.Native
 	Masked []string
 	err    error
 }
 
-// Err es el primer error de resolución.
+// Err is the first resolution error.
 func (e *Encoder) Err() error { return e.err }
 
-// S expande s, que va en la ruta path de la entrada nativa.
+// S expands s, which lives at path in the native entry.
 func (e *Encoder) S(s string, path ...string) string {
 	out, plain, err := e.Resolver.Expand(s, e.Native)
 	if err != nil && e.err == nil {
@@ -47,7 +49,7 @@ func (e *Encoder) S(s string, path ...string) string {
 	return out
 }
 
-// L expande cada elemento de una lista.
+// L expands each element of a list.
 func (e *Encoder) L(l []string, path ...string) []string {
 	if len(l) == 0 {
 		return nil
@@ -59,7 +61,7 @@ func (e *Encoder) L(l []string, path ...string) []string {
 	return out
 }
 
-// M expande los valores de un mapa a un Obj con llaves ordenadas.
+// M expands the values of a map into an Obj with sorted keys.
 func (e *Encoder) M(m map[string]string, path ...string) *native.Obj {
 	o := native.StringMap(m)
 	for _, k := range o.Keys {

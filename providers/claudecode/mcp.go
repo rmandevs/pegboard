@@ -9,13 +9,13 @@ import (
 	"github.com/rmandevs/agents-casc/internal/secrets"
 )
 
-// MCPFile: ~/.claude.json (llave mcpServers de primer nivel = alcance user)
-// o .mcp.json del proyecto.
+// MCPFile: ~/.claude.json (top-level mcpServers key = user scope) or the
+// project's .mcp.json.
 func (Provider) MCPFile(t agent.Target) native.File {
 	return native.File{Path: t.Paths.MCPs, Format: native.JSON, Container: "mcpServers"}
 }
 
-// Claude Code expande ${VAR} en command, args, env, url y headers.
+// Claude Code expands ${VAR} in command, args, env, url, and headers.
 func nativeRef(r secrets.Ref) (string, bool) {
 	if r.Kind == "env" {
 		return "${" + r.Arg + "}", true

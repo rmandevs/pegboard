@@ -13,24 +13,24 @@ import (
 const foreignClaude = `{
   "numStartups": 7,
   "mcpServers": {
-    "mio": {
+    "mine": {
       "command": "uvx",
-      "args": ["mio"]
+      "args": ["mine"]
     }
   },
   "projects": {}
 }
 `
 
-const foreignCodex = `# config de Codex
+const foreignCodex = `# Codex config
 model = "o4"
 
-[mcp_servers.mio]
+[mcp_servers.mine]
 command = "uvx"
 `
 
-// fleet es una máquina con los cuatro agentes, configs ajenas y un perfil
-// de Hermes.
+// fleet is a machine with all four agents, unmanaged configs, and a Hermes
+// profile.
 func fleet(t *testing.T) *agenttest.Machine {
 	m := agenttest.New(t)
 	for _, b := range []string{"claude", "codex", "opencode", "hermes"} {
@@ -41,7 +41,7 @@ func fleet(t *testing.T) *agenttest.Machine {
 	m.Mkdir("home/.config/opencode")
 	m.File("home/.hermes/config.yaml", "# hermes\nmodel: x\n")
 	m.Mkdir("home/.hermes/profiles/work")
-	m.Vars["GITHUB_TOKEN"] = "ghp_supersecreto"
+	m.Vars["GITHUB_TOKEN"] = "ghp_supersecret"
 	return m
 }
 
@@ -70,7 +70,7 @@ func mustContain(t *testing.T, what, got string, wants ...string) {
 	t.Helper()
 	for _, w := range wants {
 		if !strings.Contains(got, w) {
-			t.Errorf("%s: falta %q en:\n%s", what, w, got)
+			t.Errorf("%s: missing %q in:\n%s", what, w, got)
 		}
 	}
 }
@@ -79,7 +79,7 @@ func mustRun(t *testing.T, m *agenttest.Machine, want int, args ...string) strin
 	t.Helper()
 	out, errOut, code := run(m, args...)
 	if code != want {
-		t.Fatalf("%v: código %d (esperaba %d)\nstdout:\n%s\nstderr:\n%s", args, code, want, out, errOut)
+		t.Fatalf("%v: code %d (expected %d)\nstdout:\n%s\nstderr:\n%s", args, code, want, out, errOut)
 	}
 	return out + errOut
 }
@@ -93,60 +93,60 @@ func TestDeclarativeCycle(t *testing.T) {
 		"claude-code · global\n  + mcp github  (~/.claude.json)\n  + mcp notion  (~/.claude.json)",
 		"codex · global\n  + mcp github  (~/.codex/config.toml)",
 		"hermes:work · global",
-		"⚠ secreto en texto plano en /env/GITHUB_TOKEN",
-		"Plan: 7 crear, 0 modificar, 0 quitar, 0 conflictos.")
+		"⚠ secret in plain text at /env/GITHUB_TOKEN",
+		"Plan: 7 create, 0 update, 0 remove, 0 conflicts.")
 	if strings.Contains(out, "codex · global\n  + mcp notion") {
-		t.Error("notion no debía ir a codex")
+		t.Error("notion should not go to codex")
 	}
-	if strings.Contains(out, "ghp_supersecreto") {
-		t.Error("el plan no debe mostrar secretos")
+	if strings.Contains(out, "ghp_supersecret") {
+		t.Error("the plan must not show secrets")
 	}
 
-	// Sin -y pregunta; "n" cancela sin escribir.
+	// Without -y it asks; "n" cancels without writing.
 	stdin = "n\n"
 	out = mustRun(t, m, 0, "apply")
 	stdin = ""
-	mustContain(t, "cancelar", out, "¿Aplicar? [s/N]", "Cancelado")
+	mustContain(t, "cancel", out, "Apply? [y/N]", "Canceled")
 	if read(t, m, "home/.claude.json") != foreignClaude {
-		t.Fatal("cancelar no debía escribir")
+		t.Fatal("canceling should not write")
 	}
 
 	out = mustRun(t, m, 0, "apply", "-y")
-	mustContain(t, "apply", out, "Escrito ~/.claude.json (respaldo: ~/.local/state/pegboard/backups/20261019T120000Z/")
+	mustContain(t, "apply", out, "Wrote ~/.claude.json (backup: ~/.local/state/pegboard/backups/20261019T120000Z/")
 
 	claude := read(t, m, "home/.claude.json")
-	mustContain(t, ".claude.json", claude, `"numStartups": 7`, `"mio": {`, `"GITHUB_TOKEN": "${GITHUB_TOKEN}"`,
+	mustContain(t, ".claude.json", claude, `"numStartups": 7`, `"mine": {`, `"GITHUB_TOKEN": "${GITHUB_TOKEN}"`,
 		`"notion": {`, `"type": "http"`)
 	codex := read(t, m, "home/.codex/config.toml")
-	mustContain(t, "config.toml", codex, "# config de Codex", "[mcp_servers.mio]",
+	mustContain(t, "config.toml", codex, "# Codex config", "[mcp_servers.mine]",
 		"[mcp_servers.github]\ncommand = \"npx\"\nargs = [\"-y\", \"@modelcontextprotocol/server-github\"]\nenv_vars = [\"GITHUB_TOKEN\"]\n")
 	mustContain(t, "opencode.json", read(t, m, "home/.config/opencode/opencode.json"),
 		`"$schema": "https://opencode.ai/config.json"`, `"type": "local"`, `"GITHUB_TOKEN": "{env:GITHUB_TOKEN}"`)
-	mustContain(t, "hermes", read(t, m, "home/.hermes/config.yaml"), "# hermes", "GITHUB_TOKEN: ghp_supersecreto")
+	mustContain(t, "hermes", read(t, m, "home/.hermes/config.yaml"), "# hermes", "GITHUB_TOKEN: ghp_supersecret")
 	mustContain(t, "hermes:work", read(t, m, "home/.hermes/profiles/work/config.yaml"), "notion:", "url: https://mcp.notion.com/mcp")
 
 	st := read(t, m, "home/.local/state/pegboard/state.json")
-	if strings.Contains(st, "ghp_supersecreto") {
-		t.Fatal("el estado no debe contener secretos")
+	if strings.Contains(st, "ghp_supersecret") {
+		t.Fatal("state must not contain secrets")
 	}
-	mustContain(t, "estado", st, `"origin": "declared"`, `"/env/GITHUB_TOKEN"`)
+	mustContain(t, "state", st, `"origin": "declared"`, `"/env/GITHUB_TOKEN"`)
 	if b := read(t, m, "home/.local/state/pegboard/backups/20261019T120000Z/"+
 		strings.TrimLeft(strings.NewReplacer(string(filepath.Separator), "%", ":", "%").Replace(m.Path("home/.claude.json")), "%")); b != foreignClaude {
-		t.Errorf("el respaldo debía ser el original:\n%s", b)
+		t.Errorf("the backup should be the original:\n%s", b)
 	}
 
-	// Idempotente.
+	// Idempotent.
 	out = mustRun(t, m, 0, "plan", "--exit-code")
-	mustContain(t, "segundo plan", out, "Sin cambios")
+	mustContain(t, "second plan", out, "No changes")
 	mustRun(t, m, 0, "drift", "--exit-code")
 
-	// Rotar el secreto reescribe solo donde está en claro.
-	m.Vars["GITHUB_TOKEN"] = "ghp_nuevo"
+	// Rotating the secret rewrites only where it is in plain text.
+	m.Vars["GITHUB_TOKEN"] = "ghp_new"
 	out = mustRun(t, m, 2, "plan", "--exit-code")
-	mustContain(t, "rotación", out, "hermes · global\n  ~ mcp github", "hermes:work · global\n  ~ mcp github", "Plan: 0 crear, 2 modificar")
-	m.Vars["GITHUB_TOKEN"] = "ghp_supersecreto"
+	mustContain(t, "rotation", out, "hermes · global\n  ~ mcp github", "hermes:work · global\n  ~ mcp github", "Plan: 0 create, 2 update")
+	m.Vars["GITHUB_TOKEN"] = "ghp_supersecret"
 
-	// Cambiar el YAML modifica y quita.
+	// Changing the YAML updates and removes.
 	m.File("home/.config/pegboard/pegboard.yaml", `version: 1
 mcps:
   github:
@@ -156,10 +156,10 @@ mcps:
       GITHUB_TOKEN: "${env:GITHUB_TOKEN}"
 `)
 	out = mustRun(t, m, 2, "plan", "--exit-code")
-	mustContain(t, "cambio", out, "~ mcp github", "- mcp notion", "Plan: 0 crear, 5 modificar, 2 quitar")
+	mustContain(t, "change", out, "~ mcp github", "- mcp notion", "Plan: 0 create, 5 update, 2 remove")
 	mustRun(t, m, 0, "apply", "-y")
-	if c := read(t, m, "home/.claude.json"); strings.Contains(c, "notion") || !strings.Contains(c, `"mio"`) {
-		t.Fatalf("quitar notion debía respetar lo ajeno:\n%s", c)
+	if c := read(t, m, "home/.claude.json"); strings.Contains(c, "notion") || !strings.Contains(c, `"mine"`) {
+		t.Fatalf("removing notion should preserve unmanaged content:\n%s", c)
 	}
 }
 
@@ -168,42 +168,42 @@ func TestConflictsAndDrift(t *testing.T) {
 	m.File("home/.config/pegboard/pegboard.yaml", globalStack)
 	mustRun(t, m, 0, "apply", "-y", "--agent", "claude-code")
 
-	// Edición a mano: conflicto en plan, apply se detiene, drift lo ve.
+	// Manual edit: conflict in plan, apply stops, drift sees it.
 	c := read(t, m, "home/.claude.json")
 	m.File("home/.claude.json", strings.Replace(c, "server-github", "server-gitlab", 1))
 	out := mustRun(t, m, 2, "plan", "--exit-code", "--agent", "claude-code")
-	mustContain(t, "conflicto", out, "! mcp github  editado a mano desde el último apply", "1 conflicto")
+	mustContain(t, "conflict", out, "! mcp github  edited manually since the last apply", "1 conflict")
 	out = mustRun(t, m, 1, "apply", "-y", "--agent", "claude-code")
-	mustContain(t, "apply bloqueado", out, "hay conflictos")
+	mustContain(t, "blocked apply", out, "there are conflicts")
 	out = mustRun(t, m, 2, "drift", "--exit-code")
-	mustContain(t, "drift", out, "claude-code · global  mcp github  editado a mano", "Drift: 1 entrada.")
+	mustContain(t, "drift", out, "claude-code · global  mcp github  edited manually", "Drift: 1 entry.")
 
 	out = mustRun(t, m, 0, "apply", "-y", "--force", "--agent", "claude-code")
-	mustContain(t, "force", out, "(--force: se sobrescribe)")
+	mustContain(t, "force", out, "(--force: overwrite)")
 	mustRun(t, m, 0, "drift", "--exit-code")
 
-	// Borrado a mano: se vuelve a crear.
+	// Manual deletion: it is recreated.
 	m.File("home/.claude.json", foreignClaude)
 	out = mustRun(t, m, 2, "drift", "--exit-code")
-	mustContain(t, "borrado", out, "borrado a mano")
+	mustContain(t, "deleted", out, "deleted manually")
 	out = mustRun(t, m, 0, "plan", "--agent", "claude-code")
-	mustContain(t, "recrear", out, "+ mcp github  borrado a mano; se vuelve a crear")
+	mustContain(t, "recreate", out, "+ mcp github  deleted manually; recreating")
 }
 
 func TestForeignSameName(t *testing.T) {
 	m := fleet(t)
-	m.File("home/.config/pegboard/pegboard.yaml", "version: 1\nmcps:\n  mio:\n    command: npx\n")
+	m.File("home/.config/pegboard/pegboard.yaml", "version: 1\nmcps:\n  mine:\n    command: npx\n")
 	out := mustRun(t, m, 0, "plan", "--agent", "claude-code")
-	mustContain(t, "ajeno", out, "! mcp mio  ya existe y no lo creó pegboard")
+	mustContain(t, "foreign", out, "! mcp mine  already exists and was not created by pegboard")
 
-	// Si ya está igual, se adopta sin escribir.
-	m.File("home/.config/pegboard/pegboard.yaml", "version: 1\nmcps:\n  mio:\n    command: uvx\n    args: [mio]\n")
+	// If it is already identical, it is adopted without writing.
+	m.File("home/.config/pegboard/pegboard.yaml", "version: 1\nmcps:\n  mine:\n    command: uvx\n    args: [mine]\n")
 	out = mustRun(t, m, 0, "apply", "-y", "--agent", "claude-code")
-	mustContain(t, "adoptar", out, "= mcp mio  ya estaba así; pegboard lo registra", "1 adoptar")
+	mustContain(t, "adopt", out, "= mcp mine  already in place; pegboard records it", "1 adopt")
 	if read(t, m, "home/.claude.json") != foreignClaude {
-		t.Fatal("adoptar no debía reescribir el archivo")
+		t.Fatal("adopting should not rewrite the file")
 	}
-	mustContain(t, "segundo plan", mustRun(t, m, 0, "plan", "--agent", "claude-code"), "Sin cambios")
+	mustContain(t, "second plan", mustRun(t, m, 0, "plan", "--agent", "claude-code"), "No changes")
 }
 
 func TestCodexInlineIsConflict(t *testing.T) {
@@ -211,29 +211,30 @@ func TestCodexInlineIsConflict(t *testing.T) {
 	m.File("home/.codex/config.toml", "[mcp_servers]\ngithub = { command = \"x\" }\n")
 	m.File("home/.config/pegboard/pegboard.yaml", globalStack)
 	out := mustRun(t, m, 0, "plan", "--agent", "codex", "--force")
-	mustContain(t, "inline", out, "! mcp github", "no está escrito como tabla")
+	mustContain(t, "inline", out, "! mcp github", "is not written as a")
 }
 
 func TestMissingSecret(t *testing.T) {
 	m := fleet(t)
 	delete(m.Vars, "GITHUB_TOKEN")
 	m.File("home/.config/pegboard/pegboard.yaml", globalStack)
-	// Claude Code, Codex y opencode lo dejan como referencia: no hace falta.
+	// Claude Code, Codex, and opencode keep it as a reference: no value
+	// needed.
 	mustRun(t, m, 0, "plan", "--agent", "claude-code", "--agent", "codex", "--agent", "opencode")
 	out := mustRun(t, m, 1, "plan", "--agent", "hermes")
-	mustContain(t, "falta", out, "la variable GITHUB_TOKEN no está definida")
+	mustContain(t, "missing", out, "variable GITHUB_TOKEN is not defined")
 }
 
 func TestPolicyAndPhases(t *testing.T) {
 	m := fleet(t)
 	m.File("home/.config/pegboard/pegboard.yaml", globalStack+"policy:\n  allow_mcps: [github]\n")
 	out := mustRun(t, m, 1, "plan")
-	mustContain(t, "policy", out, "policy.allow_mcps no permite: notion")
+	mustContain(t, "policy", out, "policy.allow_mcps does not allow: notion")
 	m.File("home/.config/pegboard/pegboard.yaml", "version: 1\ninclude: [github.com/x/y]\n")
 	out = mustRun(t, m, 0, "plan")
-	mustContain(t, "fase 3", out, "aviso:", "include llega en la fase 3")
+	mustContain(t, "phase 3", out, "warning:", "include arrives in phase 3")
 	m.File("home/.config/pegboard/pegboard.yaml", "version: 1\nmcps:\n  x:\n    command: \"${op://v/i}\"\n")
-	mustContain(t, "fase 3", mustRun(t, m, 1, "plan"), "fase 3")
+	mustContain(t, "phase 3", mustRun(t, m, 1, "plan"), "phase 3")
 }
 
 func TestPlanJSON(t *testing.T) {
@@ -258,7 +259,7 @@ func TestPlanJSON(t *testing.T) {
 		t.Errorf("%+v", p.Changes[0])
 	}
 	if _, _, code := run(m, "apply", "--json"); code != 1 {
-		t.Error("apply --json sin -y debía fallar")
+		t.Error("apply --json without -y should fail")
 	}
 	out = mustRun(t, m, 0, "apply", "--json", "-y", "--agent", "hermes")
 	mustContain(t, "apply json", out, `"applied": true`, `"written": [`)
@@ -267,81 +268,82 @@ func TestPlanJSON(t *testing.T) {
 func TestNoStack(t *testing.T) {
 	m := fleet(t)
 	out := mustRun(t, m, 1, "plan")
-	mustContain(t, "sin stack", out, "pegboard init")
+	mustContain(t, "without stack", out, "pegboard init")
 }
 
 func TestInit(t *testing.T) {
 	m := fleet(t)
 	out := mustRun(t, m, 0, "init")
-	mustContain(t, "init", out, "Creado pegboard.yaml (agentes: claude-code, codex, opencode, hermes)")
-	mustContain(t, "contenido", read(t, m, "proj/pegboard.yaml"), "version: 1\nagents: [claude-code, codex, opencode, hermes]\n", "mcps: {}")
+	mustContain(t, "init", out, "Created pegboard.yaml (agents: claude-code, codex, opencode, hermes)")
+	mustContain(t, "content", read(t, m, "proj/pegboard.yaml"), "version: 1\nagents: [claude-code, codex, opencode, hermes]\n", "mcps: {}")
 	mustRun(t, m, 1, "init")
 	out = mustRun(t, m, 0, "plan")
-	mustContain(t, "plan vacío", out, "Sin cambios")
-	mustContain(t, "init global", mustRun(t, m, 0, "init", "--scope", "global"), "hermes")
+	mustContain(t, "empty plan", out, "No changes")
+	mustContain(t, "global init", mustRun(t, m, 0, "init", "--scope", "global"), "hermes")
 }
 
 func TestAdhoc(t *testing.T) {
 	m := fleet(t)
-	m.Mkdir("proj/.git") // regla 5: hay repo → alcance project
+	m.Mkdir("proj/.git") // rule 5: there is a repo → project scope
 	out := mustRun(t, m, 0, "install", "mcp", "fs=npx -y '@mcp/fs' /tmp", "mcp", "docs=https://docs.example/mcp",
 		"--header", "X-Key=${env:DOCS_KEY}", "--agent", "claude-code", "--agent", "opencode", "-y")
-	mustContain(t, "install", out, "claude-code · project\n  + mcp docs", "[ad-hoc]", "Escrito .mcp.json", "Escrito opencode.json")
+	mustContain(t, "install", out, "claude-code · project\n  + mcp docs", "[ad-hoc]", "Wrote .mcp.json", "Wrote opencode.json")
 	mustContain(t, ".mcp.json", read(t, m, "proj/.mcp.json"), `"@mcp/fs"`, `"X-Key": "${DOCS_KEY}"`)
 	mustContain(t, "opencode", read(t, m, "proj/opencode.json"), `"command": [`, `"X-Key": "{env:DOCS_KEY}"`)
 	mustContain(t, "gitignore", read(t, m, "proj/.pegboard/.gitignore"), "*")
-	mustContain(t, "estado", read(t, m, "proj/.pegboard/state.json"), `"origin": "adhoc"`)
+	mustContain(t, "state", read(t, m, "proj/.pegboard/state.json"), `"origin": "adhoc"`)
 	if agentExists(m.Path("proj/pegboard.yaml")) {
-		t.Fatal("install sin --save no debe crear pegboard.yaml")
+		t.Fatal("install without --save must not create pegboard.yaml")
 	}
 
 	out = mustRun(t, m, 0, "drift", "--scope", "project")
-	mustContain(t, "drift ad-hoc", out, "Ad-hoc, no declarado:", "Sin drift.")
+	mustContain(t, "ad-hoc drift", out, "Ad-hoc, not declared:", "No drift.")
 	mustRun(t, m, 2, "drift", "--scope", "project", "--strict", "--exit-code")
 
-	// Un pegboard.yaml de proyecto no borra lo ad-hoc, salvo --prune-adhoc.
+	// A project pegboard.yaml does not remove ad-hoc entries, except with
+	// --prune-adhoc.
 	m.File("proj/pegboard.yaml", "version: 1\n")
-	mustContain(t, "apply no poda", mustRun(t, m, 0, "plan", "--scope", "project"), "Sin cambios")
-	mustContain(t, "prune", mustRun(t, m, 0, "plan", "--scope", "project", "--prune-adhoc"), "- mcp fs", "Plan: 0 crear, 0 modificar, 4 quitar")
+	mustContain(t, "apply does not prune", mustRun(t, m, 0, "plan", "--scope", "project"), "No changes")
+	mustContain(t, "prune", mustRun(t, m, 0, "plan", "--scope", "project", "--prune-adhoc"), "- mcp fs", "Plan: 0 create, 0 update, 4 remove")
 
 	out = mustRun(t, m, 0, "uninstall", "mcp", "fs", "-y")
 	mustContain(t, "uninstall", out, "- mcp fs")
 	if strings.Contains(read(t, m, "proj/.mcp.json"), "@mcp/fs") {
-		t.Fatal("uninstall no quitó fs")
+		t.Fatal("uninstall did not remove fs")
 	}
-	mustContain(t, "uninstall otra vez", mustRun(t, m, 1, "uninstall", "mcp", "fs", "-y"), "pegboard no instaló")
+	mustContain(t, "uninstall again", mustRun(t, m, 1, "uninstall", "mcp", "fs", "-y"), "pegboard did not install")
 }
 
 func TestInstallSave(t *testing.T) {
 	m := fleet(t)
 	out := mustRun(t, m, 0, "install", "mcp", "gh=npx srv", "--env", "TOKEN=${env:GITHUB_TOKEN}",
 		"--scope", "global", "--agent", "codex", "--save", "-y")
-	mustContain(t, "save", out, "Guardado en ~/.config/pegboard/pegboard.yaml")
+	mustContain(t, "save", out, "Saved to ~/.config/pegboard/pegboard.yaml")
 	mustContain(t, "yaml", read(t, m, "home/.config/pegboard/pegboard.yaml"),
 		"version: 1", "gh:\n    command: npx\n    args:\n      - srv\n    env:\n      TOKEN: ${env:GITHUB_TOKEN}\n    agents:\n      - codex")
-	// TOKEN≠GITHUB_TOKEN: Codex no puede reenviarla, queda en claro.
-	mustContain(t, "codex", read(t, m, "home/.codex/config.toml"), `env = { TOKEN = "ghp_supersecreto" }`)
-	mustContain(t, "declarado", read(t, m, "home/.local/state/pegboard/state.json"), `"origin": "declared"`)
-	mustContain(t, "plan tras save", mustRun(t, m, 0, "plan", "--scope", "global"), "Sin cambios")
-	mustContain(t, "uninstall declarado", mustRun(t, m, 1, "uninstall", "mcp", "gh", "--scope", "global"), "está declarado")
+	// TOKEN≠GITHUB_TOKEN: Codex cannot forward it, so it stays in plain text.
+	mustContain(t, "codex", read(t, m, "home/.codex/config.toml"), `env = { TOKEN = "ghp_supersecret" }`)
+	mustContain(t, "declared", read(t, m, "home/.local/state/pegboard/state.json"), `"origin": "declared"`)
+	mustContain(t, "plan after save", mustRun(t, m, 0, "plan", "--scope", "global"), "No changes")
+	mustContain(t, "uninstall declared", mustRun(t, m, 1, "uninstall", "mcp", "gh", "--scope", "global"), "is declared")
 }
 
 func TestInstallParse(t *testing.T) {
 	m := fleet(t)
 	for args, want := range map[string]string{
-		"install skill":                     "necesita una fuente",
-		"install skill solo":                "no reconocida",
-		"install github.com/x/stacks//web":  "fase 3",
-		"install mcp":                       "nombre=comando",
-		"install mcp a=x --header H=1":      "--header solo aplica",
-		"install mcp a=https://x --env K=1": "--env solo aplica",
-		"install mcp a=\"x":                 "comillas",
-		"install mcp a@b=x":                 "inválido",
-		"install mcp a=x mcp a=y":           "repetido",
+		"install skill":                     "requires a source",
+		"install skill invalid":             "unrecognized",
+		"install github.com/x/stacks//web":  "phase 3",
+		"install mcp":                       "name=command",
+		"install mcp a=x --header H=1":      "--header only applies",
+		"install mcp a=https://x --env K=1": "--env only applies",
+		"install mcp a=\"x":                 "quotes",
+		"install mcp a@b=x":                 "invalid",
+		"install mcp a=x mcp a=y":           "repeated",
 	} {
 		_, errOut, code := run(m, strings.Fields(args)...)
 		if code != 1 || !strings.Contains(errOut, want) {
-			t.Errorf("%s: code=%d err=%q (esperaba %q)", args, code, errOut, want)
+			t.Errorf("%s: code=%d err=%q (expected %q)", args, code, errOut, want)
 		}
 	}
 	words, err := splitWords(`npx -y "a b" 'c d' e\ f`)
@@ -354,31 +356,32 @@ func TestImport(t *testing.T) {
 	m := fleet(t)
 	m.File("home/.claude.json", `{
   "mcpServers": {
-    "linear": {"type": "http", "url": "https://mcp.linear.app/mcp", "headers": {"Authorization": "Bearer lin_secreto"}},
-    "fs": {"type": "stdio", "command": "npx", "args": ["fs"], "env": {"API_KEY": "k_secreto"}}
+    "linear": {"type": "http", "url": "https://mcp.linear.app/mcp", "headers": {"Authorization": "Bearer lin_secret"}},
+    "fs": {"type": "stdio", "command": "npx", "args": ["fs"], "env": {"API_KEY": "k_secret"}}
   }
 }
 `)
-	m.File("home/.codex/config.toml", "[mcp_servers.fs]\ncommand = \"npx\"\nargs = [\"fs\"]\nenv = { API_KEY = \"k_secreto\" }\n")
+	m.File("home/.codex/config.toml", "[mcp_servers.fs]\ncommand = \"npx\"\nargs = [\"fs\"]\nenv = { API_KEY = \"k_secret\" }\n")
 	out := mustRun(t, m, 0, "import", "--scope", "global")
-	mustContain(t, "import", out, "Importado a ~/.config/pegboard/pegboard.yaml:",
-		"+ mcp fs (claude-code, codex)", "+ mcp linear (claude-code)", "exporta: API_KEY, LINEAR_TOKEN")
+	mustContain(t, "import", out, "Imported into ~/.config/pegboard/pegboard.yaml:",
+		"+ mcp fs (claude-code, codex)", "+ mcp linear (claude-code)", "export: API_KEY, LINEAR_TOKEN")
 	y := read(t, m, "home/.config/pegboard/pegboard.yaml")
 	mustContain(t, "yaml", y, "API_KEY: ${env:API_KEY}", "Authorization: Bearer ${env:LINEAR_TOKEN}", "agents:\n      - claude-code")
-	if strings.Contains(y, "k_secreto") || strings.Contains(y, "lin_secreto") {
-		t.Fatalf("import no debe copiar secretos al YAML:\n%s", y)
+	if strings.Contains(y, "k_secret") || strings.Contains(y, "lin_secret") {
+		t.Fatalf("import must not copy secrets into the YAML:\n%s", y)
 	}
-	if st := read(t, m, "home/.local/state/pegboard/state.json"); strings.Contains(st, "k_secreto") || strings.Contains(st, "lin_secreto") {
-		t.Fatal("ni al estado")
+	if st := read(t, m, "home/.local/state/pegboard/state.json"); strings.Contains(st, "k_secret") || strings.Contains(st, "lin_secret") {
+		t.Fatal("nor into state")
 	}
-	// Lo importado ya es de pegboard: el plan lo pasa a referencias nativas.
-	m.Vars["API_KEY"] = "k_secreto"
+	// What was imported is now pegboard's: the plan converts it to native
+	// references.
+	m.Vars["API_KEY"] = "k_secret"
 	out = mustRun(t, m, 0, "plan", "--scope", "global", "--agent", "claude-code", "--agent", "codex")
-	mustContain(t, "plan tras import", out, "claude-code · global\n  ~ mcp fs", "~ mcp linear", "codex · global\n  ~ mcp fs")
+	mustContain(t, "plan after import", out, "claude-code · global\n  ~ mcp fs", "~ mcp linear", "codex · global\n  ~ mcp fs")
 	if strings.Contains(out, "!") {
-		t.Errorf("lo importado no debía dar conflicto:\n%s", out)
+		t.Errorf("what was imported should not conflict:\n%s", out)
 	}
-	mustContain(t, "import otra vez", mustRun(t, m, 0, "import", "--scope", "global"), "No hay MCPs nuevos")
+	mustContain(t, "import again", mustRun(t, m, 0, "import", "--scope", "global"), "No new MCPs")
 }
 
 func agentExists(p string) bool { _, err := os.Stat(p); return err == nil }

@@ -9,11 +9,11 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-// tomlDoc edita config.toml de Codex por secciones de texto: cada MCP es una
-// tabla [mcp_servers.<nombre>] (más sus subtablas). Se quitan esas
-// secciones y se escribe la nueva en su lugar; comentarios y el resto del
-// archivo quedan intactos. Un MCP escrito de otra forma (tabla en línea,
-// llaves con puntos) es ErrUnsupported.
+// tomlDoc edits Codex's config.toml by text sections: each MCP is a
+// [mcp_servers.<name>] table (plus its subtables). Those sections are
+// removed and the new one is written in their place; comments and the rest
+// of the file stay intact. An MCP written another way (inline table, dotted
+// keys) is ErrUnsupported.
 type tomlDoc struct {
 	lines   []string
 	exists  bool
@@ -50,7 +50,7 @@ func (d *tomlDoc) Entries() (map[string]any, error) {
 	return out, nil
 }
 
-// header es una línea [a.b."c"] del archivo, ya separada en partes.
+// header is a [a.b."c"] line from the file, already split into parts.
 func header(line string) ([]string, bool) {
 	if strings.HasPrefix(strings.TrimSpace(line), "[[") {
 		return []string{"[["}, true
@@ -66,7 +66,7 @@ func header(line string) ([]string, bool) {
 	return parts, true
 }
 
-// splitDotted separa una llave TOML con puntos: a."b.c".d → [a b.c d].
+// splitDotted splits a dotted TOML key: a."b.c".d → [a b.c d].
 func splitDotted(s string) ([]string, error) {
 	var parts []string
 	s = strings.TrimSpace(s)
@@ -79,7 +79,7 @@ func splitDotted(s string) ([]string, error) {
 				end++
 			}
 			if end >= len(s) {
-				return nil, fmt.Errorf("comillas sin cerrar")
+				return nil, fmt.Errorf("unterminated string")
 			}
 			uq, err := strconv.Unquote(s[:end+1])
 			if err != nil {
@@ -89,7 +89,7 @@ func splitDotted(s string) ([]string, error) {
 		case '\'':
 			end := strings.IndexByte(s[1:], '\'')
 			if end < 0 {
-				return nil, fmt.Errorf("comillas sin cerrar")
+				return nil, fmt.Errorf("unterminated string")
 			}
 			part, s = s[1:end+1], s[end+2:]
 		default:
@@ -108,7 +108,7 @@ func splitDotted(s string) ([]string, error) {
 	return parts, nil
 }
 
-// sections devuelve los rangos [inicio, fin) de líneas que pertenecen al MCP.
+// sections returns the [start, end) line ranges that belong to the MCP.
 func (d *tomlDoc) sections(name string) [][2]int {
 	var out [][2]int
 	start := -1
@@ -134,7 +134,7 @@ func (d *tomlDoc) sections(name string) [][2]int {
 func (d *tomlDoc) remove(name string) (int, error) {
 	secs := d.sections(name)
 	if _, ok := d.servers()[name]; ok && len(secs) == 0 {
-		return 0, fmt.Errorf("%s.%s no está escrito como tabla [%s.%s]: %w",
+		return 0, fmt.Errorf("%s.%s is not written as a [%s.%s] table: %w",
 			d.file.Container, name, d.file.Container, name, ErrUnsupported)
 	}
 	if len(secs) == 0 {
@@ -143,8 +143,8 @@ func (d *tomlDoc) remove(name string) (int, error) {
 	at := secs[0][0]
 	for i := len(secs) - 1; i >= 0; i-- {
 		s := secs[i]
-		// La última sección conserva la línea en blanco que la separa de la
-		// siguiente; las anteriores se quitan completas.
+		// The last section keeps the blank line separating it from the
+		// next one; earlier sections are removed completely.
 		end := s[1]
 		for i == len(secs)-1 && end > s[0] && strings.TrimSpace(d.lines[end-1]) == "" {
 			end--
@@ -180,7 +180,7 @@ func (d *tomlDoc) Delete(name string) error {
 	if err != nil || at < 0 {
 		return err
 	}
-	// Quitar una línea en blanco sobrante donde estaba la sección.
+	// Remove a leftover blank line where the section used to be.
 	if at < len(d.lines) && at > 0 && strings.TrimSpace(d.lines[at]) == "" && strings.TrimSpace(d.lines[at-1]) == "" {
 		d.lines = append(d.lines[:at], d.lines[at+1:]...)
 	}
@@ -208,10 +208,10 @@ func (d *tomlDoc) Bytes() ([]byte, error) {
 		out += "\n"
 	}
 	if d.changed {
-		// Verificación: lo escrito debe volver a leerse igual.
+		// Verification: what was written must parse back the same way.
 		var check map[string]any
 		if err := toml.Unmarshal([]byte(out), &check); err != nil {
-			return nil, fmt.Errorf("el TOML resultante no es válido: %w", err)
+			return nil, fmt.Errorf("the resulting TOML is not valid: %w", err)
 		}
 	}
 	return []byte(out), nil
@@ -288,5 +288,5 @@ func tomlValue(v any) (string, error) {
 		}
 		return "{ " + strings.Join(kv, ", ") + " }", nil
 	}
-	return "", fmt.Errorf("tipo %T no soportado en TOML", v)
+	return "", fmt.Errorf("type %T is not supported in TOML", v)
 }

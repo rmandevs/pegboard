@@ -9,16 +9,16 @@ import (
 	"regexp"
 )
 
-// jsonDoc edita un archivo JSON reemplazando solo los bytes del valor del
-// contenedor. ~/.claude.json, por ejemplo, es enorme y lo reescribe Claude
-// Code: el resto se conserva byte a byte.
+// jsonDoc edits a JSON file by replacing only the bytes of the container
+// value. ~/.claude.json, for example, is huge and is rewritten by Claude
+// Code: everything else is preserved byte for byte.
 type jsonDoc struct {
 	src      []byte
 	exists   bool
 	file     File
 	indent   string
-	found    bool // el contenedor ya existía
-	valStart int  // span del valor del contenedor en src
+	found    bool // the container already existed
+	valStart int  // span of the container value in src
 	valEnd   int
 	entries  []jsonEntry
 	changed  bool
@@ -26,7 +26,7 @@ type jsonDoc struct {
 
 type jsonEntry struct {
 	key string
-	raw []byte // bytes originales, o nuevos ya indentados
+	raw []byte // original bytes, or new bytes already indented
 }
 
 var indentRe = regexp.MustCompile(`\n([ \t]+)"`)
@@ -49,7 +49,7 @@ func openJSON(src []byte, exists bool, f File) (Doc, error) {
 			return nil
 		}
 		if raw[0] != '{' {
-			return fmt.Errorf("%q no es un objeto: %w", key, ErrUnsupported)
+			return fmt.Errorf("%q is not an object: %w", key, ErrUnsupported)
 		}
 		return eachMember(raw, func(k string, s, e int) error {
 			d.entries = append(d.entries, jsonEntry{key: k, raw: raw[s:e]})
@@ -59,8 +59,8 @@ func openJSON(src []byte, exists bool, f File) (Doc, error) {
 	return d, err
 }
 
-// eachMember recorre las llaves de primer nivel de un objeto JSON y da el
-// span [start, end) de cada valor dentro de src.
+// eachMember walks the top-level keys of a JSON object and provides the span
+// [start, end) of each value inside src.
 func eachMember(src []byte, fn func(key string, start, end int) error) error {
 	dec := json.NewDecoder(bytes.NewReader(src))
 	dec.UseNumber()
@@ -69,7 +69,7 @@ func eachMember(src []byte, fn func(key string, start, end int) error) error {
 		return err
 	}
 	if d, ok := tok.(json.Delim); !ok || d != '{' {
-		return errors.New("el archivo no es un objeto JSON")
+		return errors.New("the file is not a JSON object")
 	}
 	for dec.More() {
 		tok, err := dec.Token()
@@ -90,7 +90,7 @@ func eachMember(src []byte, fn func(key string, start, end int) error) error {
 		return err
 	}
 	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
-		return errors.New("contenido extra después del objeto JSON")
+		return errors.New("extra content after the JSON object")
 	}
 	return nil
 }
@@ -136,7 +136,7 @@ func (d *jsonDoc) Delete(name string) error {
 	return nil
 }
 
-// render serializa v indentado para quedar a la profundidad depth.
+// render serializes v indented to sit at depth.
 func (d *jsonDoc) render(v any, depth int) ([]byte, error) {
 	b, err := marshal(v)
 	if err != nil {
@@ -202,7 +202,7 @@ func (d *jsonDoc) Bytes() ([]byte, error) {
 		b.WriteString("\n}\n")
 		return b.Bytes(), nil
 	}
-	// Agregar el contenedor como última llave del objeto raíz.
+	// Add the container as the last key of the root object.
 	end := bytes.LastIndexByte(d.src, '}')
 	head := bytes.TrimRight(d.src[:end], " \t\r\n")
 	out := append([]byte{}, head...)

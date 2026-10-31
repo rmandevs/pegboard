@@ -1,6 +1,6 @@
-// Package state guarda qué escribió pegboard en cada target (SPEC §3.4): es
-// lo que permite no pisar lo ajeno y detectar drift. Nunca contiene
-// secretos: solo hashes calculados con los secretos enmascarados.
+// Package state records what pegboard wrote to each target (SPEC §3.4): it is
+// what lets pegboard avoid overwriting unmanaged content and detect drift.
+// It never contains secrets: only hashes computed with secrets masked.
 package state
 
 import (
@@ -13,8 +13,8 @@ import (
 	"sort"
 )
 
-// Origin dice por qué existe un recurso: declarado en pegboard.yaml o
-// instalado con `pegboard install`.
+// Origin says why a resource exists: declared in pegboard.yaml or installed
+// with `pegboard install`.
 type Origin string
 
 const (
@@ -22,7 +22,7 @@ const (
 	Adhoc    Origin = "adhoc"
 )
 
-// Entry es un MCP que pegboard escribió en un archivo.
+// Entry is an MCP that pegboard wrote to a file.
 type Entry struct {
 	File   string   `json:"file"`
 	Hash   string   `json:"hash"`
@@ -30,27 +30,27 @@ type Entry struct {
 	Origin Origin   `json:"origin"`
 }
 
-// SkillEntry es una skill que pegboard puso en una carpeta de skills: un
-// symlink al caché (o una copia, donde no hay symlinks).
+// SkillEntry is a skill that pegboard placed in a skills directory: a
+// symlink to the cache (or a copy, where symlinks are unavailable).
 type SkillEntry struct {
 	Source string `json:"source"`
 	Hash   string `json:"hash"`
-	// Link es a dónde apunta el symlink (el caché, o la carpeta local).
+	// Link is where the symlink points (the cache, or the local directory).
 	Link string `json:"link"`
-	// Copy: se copió en vez de enlazar.
+	// Copy: it was copied instead of linked.
 	Copy   bool   `json:"copy,omitempty"`
 	Origin Origin `json:"origin"`
 }
 
-// ContextEntry registra lo que pegboard agregó a un archivo de contexto (el
-// puente @AGENTS.md en CLAUDE.md) para poder quitarlo después.
+// ContextEntry records what pegboard added to a context file (the
+// @AGENTS.md bridge in CLAUDE.md) so it can be removed later.
 type ContextEntry struct {
 	Line string `json:"line"`
 }
 
-// State de un alcance. Targets: ID del target ("hermes:work") → nombre →
-// entrada de MCP. Skills: carpeta de skills → nombre → entrada (una carpeta
-// puede servir a varios agentes). Context: archivo → lo agregado.
+// State for a scope. Targets: target ID ("hermes:work") → name → MCP entry.
+// Skills: skills directory → name → entry (one directory may serve several
+// agents). Context: file → what was added.
 type State struct {
 	Version int                              `json:"version"`
 	Targets map[string]map[string]Entry      `json:"targets"`
@@ -60,7 +60,7 @@ type State struct {
 	path string
 }
 
-// Skill devuelve la entrada de una skill en una carpeta.
+// Skill returns the entry for a skill in a directory.
 func (s *State) Skill(dir, name string) (SkillEntry, bool) {
 	e, ok := s.Skills[dir][name]
 	return e, ok
@@ -83,7 +83,7 @@ func (s *State) DeleteSkill(dir, name string) {
 	}
 }
 
-// SkillNames son las skills registradas en una carpeta, ordenadas.
+// SkillNames lists the skills registered in a directory, sorted.
 func (s *State) SkillNames(dir string) []string {
 	var out []string
 	for n := range s.Skills[dir] {
@@ -93,7 +93,7 @@ func (s *State) SkillNames(dir string) []string {
 	return out
 }
 
-// SkillDirs son las carpetas con skills registradas, ordenadas.
+// SkillDirs lists the directories with registered skills, sorted.
 func (s *State) SkillDirs() []string {
 	var out []string
 	for d := range s.Skills {
@@ -103,7 +103,7 @@ func (s *State) SkillDirs() []string {
 	return out
 }
 
-// Load lee el estado; si el archivo no existe devuelve uno vacío.
+// Load reads the state; if the file does not exist it returns an empty one.
 func Load(path string) (*State, error) {
 	s := &State{Version: 1, Targets: map[string]map[string]Entry{}, path: path}
 	b, err := os.ReadFile(path)
@@ -117,7 +117,7 @@ func Load(path string) (*State, error) {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	if s.Version != 1 {
-		return nil, fmt.Errorf("%s: versión de estado %d no soportada", path, s.Version)
+		return nil, fmt.Errorf("%s: unsupported state version %d", path, s.Version)
 	}
 	if s.Targets == nil {
 		s.Targets = map[string]map[string]Entry{}
@@ -128,7 +128,7 @@ func Load(path string) (*State, error) {
 
 func (s *State) Path() string { return s.path }
 
-// Get devuelve la entrada de un MCP en un target.
+// Get returns the entry for an MCP in a target.
 func (s *State) Get(target, name string) (Entry, bool) {
 	e, ok := s.Targets[target][name]
 	return e, ok
@@ -148,7 +148,7 @@ func (s *State) Delete(target, name string) {
 	}
 }
 
-// Names son los MCPs registrados en un target, ordenados.
+// Names lists the MCPs registered in a target, sorted.
 func (s *State) Names(target string) []string {
 	var out []string
 	for n := range s.Targets[target] {
@@ -158,7 +158,7 @@ func (s *State) Names(target string) []string {
 	return out
 }
 
-// TargetIDs son los targets con algo registrado, ordenados.
+// TargetIDs lists the targets with something registered, sorted.
 func (s *State) TargetIDs() []string {
 	var out []string
 	for t := range s.Targets {
@@ -168,8 +168,8 @@ func (s *State) TargetIDs() []string {
 	return out
 }
 
-// Save escribe el estado de forma atómica. En un proyecto, la carpeta
-// .pegboard/ lleva su propio .gitignore: el estado es de cada máquina.
+// Save writes the state atomically. In a project, the .pegboard/ directory
+// gets its own .gitignore: the state belongs to each machine.
 func (s *State) Save() error {
 	b, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {

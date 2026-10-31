@@ -13,7 +13,7 @@ import (
 	"github.com/rmandevs/agents-casc/internal/stack"
 )
 
-// editResult es la salida JSON de add y remove.
+// editResult is the JSON output of add and remove.
 type editResult struct {
 	File    string   `json:"file"`
 	Added   []string `json:"added"`
@@ -50,17 +50,17 @@ func writeEdit(cmd *cobra.Command, opts *options, env agent.Env, r editResult) e
 	for _, d := range r.Removed {
 		fmt.Fprintf(out, "  - %s\n", d)
 	}
-	fmt.Fprintln(out, "Revisa con `pegboard plan` y aplica con `pegboard apply`.")
+	fmt.Fprintln(out, "Review with `pegboard plan` and apply with `pegboard apply`.")
 	return nil
 }
 
 func newAddCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 	var envs, headers []string
 	cmd := &cobra.Command{
-		Use:   "add [mcp <nombre>=<comando|url>…] [skill <fuente>…]",
-		Short: "Agrega MCPs o skills a pegboard.yaml (no aplica)",
+		Use:   "add [mcp <name>=<command|url>…] [skill <source>…]",
+		Short: "Add MCPs or skills to pegboard.yaml (does not apply)",
 		Example: `  pegboard add mcp github='npx -y @modelcontextprotocol/server-github' --env GITHUB_TOKEN='${env:GITHUB_TOKEN}'
-  pegboard add skill mattpocock/skills@tdd ./skills/mia`,
+  pegboard add skill mattpocock/skills@tdd ./skills/mine`,
 		Args: cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			mcps, order, sources, err := parseInstall(args, envs, headers)
@@ -102,15 +102,15 @@ func newAddCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 			return writeEdit(cmd, opts, env, r)
 		},
 	}
-	cmd.Flags().StringArrayVar(&envs, "env", nil, "variable para los MCPs stdio: K=V (repetible)")
-	cmd.Flags().StringArrayVar(&headers, "header", nil, "header para los MCPs http: K=V (repetible)")
+	cmd.Flags().StringArrayVar(&envs, "env", nil, "variable for stdio MCPs: K=V (repeatable)")
+	cmd.Flags().StringArrayVar(&headers, "header", nil, "header for http MCPs: K=V (repeatable)")
 	return cmd
 }
 
 func newRemoveCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 	return &cobra.Command{
-		Use:   "remove [mcp <nombre>…] [skill <fuente|nombre>…]",
-		Short: "Quita MCPs o skills de pegboard.yaml (no aplica)",
+		Use:   "remove [mcp <name>…] [skill <source|name>…]",
+		Short: "Remove MCPs or skills from pegboard.yaml (does not apply)",
 		Args:  cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			env, err := newEnv(opts.dir)
@@ -129,7 +129,7 @@ func newRemoveCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 				case a == "mcp" || a == "skill":
 					kind = a
 				case kind == "":
-					return fmt.Errorf("esperaba `remove mcp|skill nombre…`, no %q", a)
+					return fmt.Errorf("expected `remove mcp|skill name…`, not %q", a)
 				case kind == "mcp":
 					if !ed.HasMCP(a) {
 						missing = append(missing, "mcp "+a)
@@ -153,7 +153,7 @@ func newRemoveCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 				}
 			}
 			if len(missing) > 0 {
-				return fmt.Errorf("%s no declara: %s", env.Pretty(ed.Path()), strings.Join(missing, ", "))
+				return fmt.Errorf("%s does not declare: %s", env.Pretty(ed.Path()), strings.Join(missing, ", "))
 			}
 			if err := ed.Save(); err != nil {
 				return err
@@ -166,7 +166,7 @@ func newRemoveCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 func newAdoptCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 	return &cobra.Command{
 		Use:   "adopt",
-		Short: "Pasa a pegboard.yaml todo lo instalado ad-hoc",
+		Short: "Move everything installed ad-hoc into pegboard.yaml",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			env, err := newEnv(opts.dir)
@@ -190,7 +190,7 @@ func newAdoptCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 				total += n
 			}
 			if total == 0 {
-				fmt.Fprintln(cmd.OutOrStdout(), "No hay nada instalado ad-hoc.")
+				fmt.Fprintln(cmd.OutOrStdout(), "Nothing is installed ad-hoc.")
 			}
 			return nil
 		},
@@ -200,8 +200,8 @@ func newAdoptCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 func newUpdateCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 	var yes bool
 	cmd := &cobra.Command{
-		Use:   "update [fuente|nombre…]",
-		Short: "Re-resuelve las skills y actualiza pegboard.lock (muestra el diff)",
+		Use:   "update [source|name…]",
+		Short: "Re-resolve skills and update pegboard.lock (shows the diff)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			env, err := newEnv(opts.dir)
 			if err != nil {
@@ -266,23 +266,23 @@ func newUpdateCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 						return err
 					}
 				}
-				fmt.Fprintln(out, "Las skills ya están al día.")
+				fmt.Fprintln(out, "Skills are already up to date.")
 				return nil
 			}
 			if !yes && !confirm(cmd.InOrStdin(), out) {
-				fmt.Fprintln(out, "Cancelado; pegboard.lock no cambió.")
+				fmt.Fprintln(out, "Canceled; pegboard.lock unchanged.")
 				return nil
 			}
 			for _, l := range pending {
 				if err := l.Save(); err != nil {
 					return err
 				}
-				fmt.Fprintf(out, "Escrito %s. Corre `pegboard apply` para instalarlo.\n", env.Pretty(l.Path()))
+				fmt.Fprintf(out, "Wrote %s. Run `pegboard apply` to install it.\n", env.Pretty(l.Path()))
 			}
 			return nil
 		},
 	}
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "no pedir confirmación")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation")
 	return cmd
 }
 
@@ -307,12 +307,13 @@ func hasSkill(l []skills.Skill, name string) bool {
 	return false
 }
 
-// fileDiff resume qué archivos cambiaron entre la versión del caché y la nueva.
+// fileDiff summarizes which files changed between the cached version and the
+// new one.
 func fileDiff(r *skills.Resolver, prevHash string, sk skills.Skill) string {
 	before, err1 := skills.Files(r.CachedDir(prevHash))
 	after, err2 := skills.Files(sk.Dir)
 	if err1 != nil || err2 != nil {
-		return " (la versión anterior no está en el caché)"
+		return " (the previous version is not in the cache)"
 	}
 	var parts []string
 	for f, h := range after {
@@ -334,19 +335,19 @@ func fileDiff(r *skills.Resolver, prevHash string, sk skills.Skill) string {
 func newSkillCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "skill",
-		Short: "La skill propia de pegboard",
+		Short: "Pegboard's built-in skill",
 	}
-	var yes bool
+	var yesInstall bool
 	install := &cobra.Command{
 		Use:   "install",
-		Short: "Instala la skill de pegboard en los agentes (default: alcance global)",
+		Short: "Install the pegboard skill on agents (default: global scope)",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if opts.scope == "" {
 				opts.scope = string(agent.Global)
 			}
 			inst := newInstallCmd(opts, newEnv)
-			if yes {
+			if yesInstall {
 				if err := inst.Flags().Set("yes", "true"); err != nil {
 					return err
 				}
@@ -357,7 +358,30 @@ func newSkillCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 			return inst.RunE(inst, []string{"skill", "pegboard"})
 		},
 	}
-	install.Flags().BoolVarP(&yes, "yes", "y", false, "no pedir confirmación")
-	cmd.AddCommand(install)
+	install.Flags().BoolVarP(&yesInstall, "yes", "y", false, "do not ask for confirmation")
+
+	var yesUninstall bool
+	uninstall := &cobra.Command{
+		Use:   "uninstall",
+		Short: "Uninstall the pegboard skill from agents (default: global scope)",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if opts.scope == "" {
+				opts.scope = string(agent.Global)
+			}
+			un := newUninstallCmd(opts, newEnv)
+			if yesUninstall {
+				if err := un.Flags().Set("yes", "true"); err != nil {
+					return err
+				}
+			}
+			un.SetIn(cmd.InOrStdin())
+			un.SetOut(cmd.OutOrStdout())
+			un.SetErr(cmd.ErrOrStderr())
+			return un.RunE(un, []string{"skill", "pegboard"})
+		},
+	}
+	uninstall.Flags().BoolVarP(&yesUninstall, "yes", "y", false, "do not ask for confirmation")
+	cmd.AddCommand(install, uninstall)
 	return cmd
 }

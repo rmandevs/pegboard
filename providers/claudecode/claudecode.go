@@ -1,4 +1,4 @@
-// Package claudecode es el provider de Claude Code.
+// Package claudecode is the Claude Code provider.
 package claudecode
 
 import (
@@ -12,8 +12,8 @@ type Provider struct{}
 func (Provider) ID() string   { return "claude-code" }
 func (Provider) Version() int { return 1 }
 
-// Detect: instalado si `claude` está en el PATH o existe su config de
-// usuario. $CLAUDE_CONFIG_DIR mueve ~/.claude y, con él, .claude.json.
+// Detect: installed if `claude` is on PATH or its user config exists.
+// $CLAUDE_CONFIG_DIR moves ~/.claude and, with it, .claude.json.
 func (p Provider) Detect(env agent.Env, scope agent.Scope) []agent.Target {
 	cfgDir := filepath.Join(env.Home, ".claude")
 	claudeJSON := filepath.Join(env.Home, ".claude.json")

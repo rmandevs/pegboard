@@ -1,4 +1,4 @@
-# Ejemplo de SPEC §3.1.
+# SPEC §3.1 example.
 version: 1
 agents: [claude-code, codex, opencode, hermes]
 inherit: global
@@ -19,7 +19,7 @@ mcps:
 skills:
   - mattpocock/tdd
   - github.com/anthropics/skills//pdf?ref=main
-  - ./skills/mi-skill
+  - ./skills/my-skill
 
 context:
   agents_md: true

@@ -12,9 +12,9 @@ import (
 	"strings"
 )
 
-// Hash es el hash del contenido de una carpeta: rutas, bit de ejecución y
-// contenido de cada archivo (y destino de los symlinks internos). No
-// depende de fechas ni de permisos más allá del bit x.
+// Hash is the hash of a directory's content: paths, executable bit, and
+// content of each file (and targets of internal symlinks). It does not
+// depend on dates or permissions beyond the executable bit.
 func Hash(dir string) (string, error) {
 	type item struct{ rel, line string }
 	var items []item
@@ -75,7 +75,7 @@ func Hash(dir string) (string, error) {
 	return "sha256:" + hex.EncodeToString(sum[:]), nil
 }
 
-// Short abrevia un hash para mostrarlo.
+// Short shortens a hash for display.
 func Short(h string) string {
 	h = strings.TrimPrefix(h, "sha256:")
 	if len(h) > 7 {
@@ -84,7 +84,7 @@ func Short(h string) string {
 	return h
 }
 
-// CopyDir copia src en dst (que no debe existir), sin .git.
+// CopyDir copies src into dst (which must not exist), excluding .git.
 func CopyDir(src, dst string) error {
 	return filepath.WalkDir(src, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -120,8 +120,8 @@ func CopyDir(src, dst string) error {
 	})
 }
 
-// Files lista los archivos de una carpeta con el hash de cada uno, para
-// mostrar qué cambió en `pegboard update`.
+// Files lists a directory's files with each one's hash, to show what changed
+// in `pegboard update`.
 func Files(dir string) (map[string]string, error) {
 	out := map[string]string{}
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
