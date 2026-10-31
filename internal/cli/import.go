@@ -16,7 +16,7 @@ import (
 	"github.com/rmandevs/agents-casc/internal/state"
 )
 
-// found es un MCP ajeno encontrado en un target al importar.
+// found is an unmanaged MCP found in a target during import.
 type found struct {
 	target agent.Target
 	file   string
@@ -28,11 +28,10 @@ type found struct {
 func newImportCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 	return &cobra.Command{
 		Use:   "import",
-		Short: "Adopta los MCPs que ya tienen los agentes en pegboard.yaml",
-		Long: `Lee la config de cada agente, agrega a pegboard.yaml los MCPs que pegboard
-no gestiona todavía y los registra en el estado. Los secretos en claro
-(env y headers) se reemplazan por referencias ${env:…}: exporta esas
-variables antes de apply.`,
+		Short: "Adopt the MCPs already configured by agents into pegboard.yaml",
+		Long: `Read each agent's config, add the MCPs pegboard does not manage yet to
+pegboard.yaml, and record them in state. Plain-text secrets (env and headers)
+are replaced with ${env:…} references: export those variables before apply.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			env, err := newEnv(opts.dir)
@@ -57,18 +56,18 @@ variables antes de apply.`,
 				total += n
 			}
 			if total == 0 {
-				fmt.Fprintln(out, "No hay MCPs nuevos que importar.")
+				fmt.Fprintln(out, "No new MCPs to import.")
 			} else {
-				fmt.Fprintln(out, "Revisa con `pegboard plan`.")
+				fmt.Fprintln(out, "Review with `pegboard plan`.")
 			}
 			return nil
 		},
 	}
 }
 
-// importScope pasa a pegboard.yaml los MCPs de los targets del alcance. Con
-// adopt=false toma los que pegboard no gestiona (import); con adopt=true,
-// los instalados ad-hoc, y además las skills ad-hoc (adopt).
+// importScope moves the scope's targets' MCPs into pegboard.yaml. With
+// adopt=false it takes what pegboard does not manage (import); with
+// adopt=true, the ad-hoc installed entries, plus ad-hoc skills (adopt).
 func importScope(c *scopeCtx, out interface{ Write([]byte) (int, error) }, env agent.Env, adopt bool) (int, error) {
 	byName := map[string][]found{}
 	var vars []string
@@ -93,7 +92,7 @@ func importScope(c *scopeCtx, out interface{ Write([]byte) (int, error) }, env a
 			}
 			m, err := p.DecodeMCP(obs)
 			if err != nil {
-				fmt.Fprintf(out, "aviso: %s · %s: mcp %s no se pudo leer (%v); se omite\n", t.ID(), c.scope, name, err)
+				fmt.Fprintf(out, "warning: %s · %s: mcp %s could not be read (%v); skipping\n", t.ID(), c.scope, name, err)
 				continue
 			}
 			m, literals, vs := toReferences(name, m)
@@ -144,14 +143,14 @@ func importScope(c *scopeCtx, out interface{ Write([]byte) (int, error) }, env a
 			if fd.mcp.Equal(first.mcp) {
 				same = append(same, fd)
 			} else {
-				fmt.Fprintf(out, "aviso: mcp %s en %s difiere del de %s; se importa el de %s\n",
+				fmt.Fprintf(out, "warning: mcp %s in %s differs from the one in %s; importing the one from %s\n",
 					name, fd.target.ID(), first.target.ID(), first.target.ID())
 			}
 		}
 		m := first.mcp
 		if d, ok := declared[name]; ok {
 			if !d.Equal(m) {
-				fmt.Fprintf(out, "aviso: mcp %s ya está declarado distinto en %s; se omite\n", name, stack.FileName)
+				fmt.Fprintf(out, "warning: mcp %s is already declared differently in %s; skipping\n", name, stack.FileName)
 				continue
 			}
 		} else {
@@ -197,18 +196,18 @@ func importScope(c *scopeCtx, out interface{ Write([]byte) (int, error) }, env a
 	if err := c.state.Save(); err != nil {
 		return 0, err
 	}
-	verb := "Importado"
+	verb := "Imported into"
 	if adopt {
-		verb = "Adoptado"
+		verb = "Adopted into"
 	}
-	fmt.Fprintf(out, "%s a %s:\n", verb, env.Pretty(path))
+	fmt.Fprintf(out, "%s %s:\n", verb, env.Pretty(path))
 	for _, s := range imported {
 		fmt.Fprintf(out, "  + %s\n", s)
 	}
 	if len(vars) > 0 {
 		sort.Strings(vars)
 		vars = compact(vars)
-		fmt.Fprintf(out, "Los secretos quedaron como ${env:…}; exporta: %s\n", strings.Join(vars, ", "))
+		fmt.Fprintf(out, "Secrets were replaced with ${env:…}; export: %s\n", strings.Join(vars, ", "))
 	}
 	return len(imported), nil
 }
@@ -233,9 +232,9 @@ func compact(l []string) []string {
 
 var unsafeVar = regexp.MustCompile(`[^A-Z0-9_]+`)
 
-// toReferences cambia los valores en claro de env y headers por referencias
-// ${env:…}. Devuelve los valores originales (para enmascararlos en el
-// estado) y las variables que el usuario debe exportar.
+// toReferences replaces plain-text env and header values with ${env:…}
+// references. It returns the original values (to mask them in state) and
+// the variables the user must export.
 func toReferences(name string, m mcp.MCP) (mcp.MCP, []string, []string) {
 	var literals, vars []string
 	if len(m.Env) > 0 {
@@ -275,8 +274,8 @@ func toReferences(name string, m mcp.MCP) (mcp.MCP, []string, []string) {
 	return m, literals, vars
 }
 
-// maskLiterals devuelve las rutas de obs cuyos strings contienen alguno de
-// los secretos: así el hash del estado no depende de ellos.
+// maskLiterals returns the paths in obs whose strings contain any of the
+// secrets, so the state hash does not depend on them.
 func maskLiterals(obs any, literals []string) []string {
 	if len(literals) == 0 {
 		return nil

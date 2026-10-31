@@ -11,7 +11,7 @@ import (
 	"github.com/rmandevs/agents-casc/internal/state"
 )
 
-// Result de Apply: qué archivos se escribieron y dónde quedó su respaldo.
+// Result of Apply: which files were written and where their backups went.
 type Result struct {
 	Written []Written
 }
@@ -21,11 +21,11 @@ type Written struct {
 	Backup string
 }
 
-// ErrBlocked: el plan tiene conflictos sin resolver.
-var ErrBlocked = errors.New("hay conflictos: resuélvelos a mano o usa --force")
+// ErrBlocked: the plan has unresolved conflicts.
+var ErrBlocked = errors.New("there are conflicts: resolve them manually or use --force")
 
-// Apply escribe los archivos que el plan editó (respaldando antes cada uno)
-// y después el estado de cada alcance. backupDir es la carpeta de backups.
+// Apply writes the files the plan edited (backing up each one first) and
+// then the state for each scope. backupDir is the backup directory.
 func Apply(p *Plan, backupDir string, now time.Time) (*Result, error) {
 	if p.Blocked() {
 		return nil, ErrBlocked
@@ -99,7 +99,7 @@ func Apply(p *Plan, backupDir string, now time.Time) (*Result, error) {
 	return res, nil
 }
 
-// touched informa si algún cambio escribe en path.
+// touched reports whether any change writes to path.
 func touched(p *Plan, path string) bool {
 	for _, c := range p.Changes {
 		if c.File == path && (c.do == Create || c.do == Update || c.do == Delete) {

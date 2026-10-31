@@ -1,68 +1,78 @@
 ---
 name: pegboard
-description: Instala, quita y sincroniza MCPs, skills y AGENTS.md en Claude Code, Codex, opencode y Hermes con el CLI `pegboard`. Úsala siempre que el usuario pida agregar, quitar, listar o sincronizar un servidor MCP o una skill en uno o varios agentes ("agrégame el MCP de Linear", "instala esta skill en todos mis agentes", "¿qué MCPs tengo?"), o cuando el proyecto tenga un pegboard.yaml.
+description: Install, remove, and sync MCPs, skills, and AGENTS.md in Claude Code, Codex, opencode, and Hermes with the `pegboard` CLI. Use it whenever the user asks to add, remove, list, or sync an MCP server or a skill across one or more agents ("add the Linear MCP", "install this skill on all my agents", "what MCPs do I have?"), or when the project has a pegboard.yaml.
 ---
 
 # pegboard
 
-`pegboard` traduce un estado deseado (MCPs, skills, contexto) a los archivos
-nativos de cada agente, con código determinista, estado y backups. Úsalo en
-lugar de editar esos archivos tú mismo.
+`pegboard` translates a desired state (MCPs, skills, context) into each
+agent's native files, with deterministic code, state, and backups. Use it
+instead of editing those files yourself.
 
-## Reglas
+## Rules
 
-1. **Nunca edites a mano** `.mcp.json`, `~/.claude.json`, `.codex/config.toml`,
-   `opencode.json`, `~/.hermes/config.yaml` ni las carpetas de skills
-   (`.claude/skills`, `.agents/skills`, …). Hazlo con `pegboard`.
-2. **Primero el plan, luego aplicar.** Corre el comando con `--json` sin `-y`
-   (o `pegboard plan --json`), resume al usuario qué va a cambiar y solo
-   después repite con `-y`.
-3. **Conflictos (`"action": "conflict"`): pregunta.** Significa que alguien
-   editó a mano algo que pegboard maneja, o que ya existe algo con ese nombre
-   que pegboard no creó. Explica el `reason` y pregunta antes de usar
-   `--force`.
-4. **Nunca escribas secretos en claro.** Usa referencias: `${env:NOMBRE}` o
-   `${file:~/.secrets/archivo}`. Si el plan trae `warnings` de "secreto en
-   texto plano", díselo al usuario: ese agente no admite referencias.
+1. **Never edit by hand** `.mcp.json`, `~/.claude.json`, `.codex/config.toml`,
+   `opencode.json`, `~/.hermes/config.yaml`, or the skills directories
+   (`.claude/skills`, `.agents/skills`, …). Use `pegboard`.
+2. **Plan first, then apply.** Run the command with `--json` without `-y`
+   (or `pegboard plan --json`), summarize for the user what will change, and
+   only then repeat with `-y`.
+3. **Conflicts (`"action": "conflict"`): ask.** It means someone edited by
+   hand something pegboard manages, or something with that name already
+   exists that pegboard did not create. Explain the `reason` and ask before
+   using `--force`.
+4. **Never write secrets in plain text.** Use references: `${env:NAME}` or
+   `${file:~/.secrets/file}`. If the plan contains "plain text secret"
+   warnings, tell the user: that agent does not support references.
 
-## Qué comando usar
+## Which command to use
 
-¿Hay un `pegboard.yaml` en el proyecto (o en `~/.config/pegboard/`)?
+Is there a `pegboard.yaml` in the project (or in `~/.config/pegboard/`)?
 
-- **Sí → declarativo.** Edita el stack y aplica:
+- **Yes → declarative.** Edit the stack and apply:
   ```
   pegboard add mcp github='npx -y @modelcontextprotocol/server-github' --env GITHUB_TOKEN='${env:GITHUB_TOKEN}'
   pegboard add mcp notion=https://mcp.notion.com/mcp --agent claude-code
   pegboard add skill vercel-labs/agent-skills@web-design-guidelines
   pegboard remove mcp notion
-  pegboard plan --json        # muestra el resumen al usuario
+  pegboard plan --json        # show the summary to the user
   pegboard apply -y --json
   ```
-- **No → ad-hoc.** Instala ya, sin YAML:
+- **No → ad-hoc.** Install now, without YAML:
   ```
   pegboard install mcp github='npx -y @modelcontextprotocol/server-github' --env GITHUB_TOKEN='${env:GITHUB_TOKEN}' --json -y
   pegboard install skill mattpocock/skills@tdd -y
   pegboard uninstall mcp github -y
   ```
-  Agrega `--save` si el usuario quiere que quede declarado.
+  Add `--save` if the user wants it declared.
 
-Sin `--agent`, todo va a todos los agentes detectados; repite `--agent` para
-limitar (`claude-code`, `codex`, `opencode`, `hermes`, `hermes:<perfil>`).
-`--scope global` es para el usuario; `--scope project` para la carpeta actual.
+Without `--agent`, everything goes to all detected agents; repeat `--agent`
+to limit it (`claude-code`, `codex`, `opencode`, `hermes`, `hermes:<profile>`).
+`--scope global` is for the user; `--scope project` is for the current
+directory.
 
-## Fuentes de skills
-
-`owner/repo` (todas las skills del repo), `owner/repo@skill` (una),
-`github.com/owner/repo//ruta?ref=v1`, una URL git, `./ruta` local o `pegboard`
-(esta skill).
-
-## Para revisar
+## Built-in skill
 
 ```
-pegboard agents --json          # agentes detectados y sus rutas
-pegboard drift --json           # ¿alguien cambió a mano lo que maneja pegboard?
-pegboard update                 # nuevas versiones de skills (muestra el diff)
+pegboard skill install -y      # install this skill on the detected agents
+pegboard skill uninstall -y    # remove it from the detected agents
 ```
 
-Códigos de salida: `0` bien, `1` error, `2` hay cambios o drift (con
+Both default to the global scope. Repeat `--agent` to limit them.
+
+## Skill sources
+
+`owner/repo` (all skills in the repo), `owner/repo@skill` (one),
+`github.com/owner/repo//path?ref=v1`, a git URL, a local `./path`, or
+`pegboard` (this skill).
+
+## To review
+
+```
+pegboard agents --json          # detected agents and their paths
+pegboard drift --json           # did anyone edit pegboard-managed files by hand?
+pegboard update                 # new skill versions (shows the diff)
+```
+
+Exit codes: `0` ok, `1` error, `2` there are changes or drift (with
 `--exit-code`).

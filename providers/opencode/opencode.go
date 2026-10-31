@@ -1,4 +1,4 @@
-// Package opencode es el provider de opencode.
+// Package opencode is the opencode provider.
 package opencode
 
 import (
@@ -12,7 +12,7 @@ type Provider struct{}
 func (Provider) ID() string   { return "opencode" }
 func (Provider) Version() int { return 1 }
 
-// Detect: instalado si `opencode` está en el PATH o existe su carpeta en
+// Detect: installed if `opencode` is on PATH or its directory exists in
 // $XDG_CONFIG_HOME (~/.config/opencode).
 func (p Provider) Detect(env agent.Env, scope agent.Scope) []agent.Target {
 	cfgDir := filepath.Join(env.XDGConfig(), "opencode")
@@ -31,7 +31,7 @@ func (p Provider) Detect(env agent.Env, scope agent.Scope) []agent.Target {
 		dir := env.ProjectDir
 		paths := agent.Paths{
 			MCPs: filepath.Join(dir, "opencode.json"),
-			// .agents/skills: la carpeta "universal" que comparte con Codex.
+			// .agents/skills: the "universal" directory shared with Codex.
 			Skills:  filepath.Join(dir, ".agents", "skills"),
 			Context: filepath.Join(dir, "AGENTS.md"),
 		}

@@ -21,13 +21,13 @@ import (
 
 var nameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`)
 
-// adhocScope aplica la regla 5 de SPEC §4.1: project si hay pegboard.yaml o
-// un repo git en la carpeta; si no, global.
+// adhocScope applies rule 5 of SPEC §4.1: project if there is a
+// pegboard.yaml or a git repo in the directory; otherwise global.
 func (o *options) adhocScope(env agent.Env) (agent.Scope, error) {
 	if o.scope != "" {
 		s, ok := agent.ParseScope(o.scope)
 		if !ok {
-			return "", fmt.Errorf("--scope %q inválido: usa global o project", o.scope)
+			return "", fmt.Errorf("--scope %q is invalid: use global or project", o.scope)
 		}
 		return s[0], nil
 	}
@@ -42,13 +42,13 @@ func newInstallCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 	var envs, headers []string
 	var save bool
 	cmd := &cobra.Command{
-		Use:   "install [mcp <nombre>=<comando|url>…] [skill <fuente>…]",
-		Short: "Instala ya, sin pegboard.yaml (modo ad-hoc)",
-		Long: `Instala MCPs y skills en los agentes detectados, con el mismo plan, estado y
-respaldos que apply, sin tocar pegboard.yaml (salvo con --save).
+		Use:   "install [mcp <name>=<command|url>…] [skill <source>…]",
+		Short: "Install now, without pegboard.yaml (ad-hoc mode)",
+		Long: `Install MCPs and skills on the detected agents with the same plan, state, and
+backups as apply, without touching pegboard.yaml (unless --save is used).
 
-Fuentes de skills (las mismas que npx skills): owner/repo, owner/repo@skill,
-github.com/owner/repo//ruta?ref=v1, una URL git, ./ruta local o pegboard.`,
+Skill sources (the same as npx skills): owner/repo, owner/repo@skill,
+github.com/owner/repo//path?ref=v1, a git URL, a local ./path, or pegboard.`,
 		Example: `  pegboard install mcp github='npx -y @modelcontextprotocol/server-github' \
                    --env GITHUB_TOKEN='${env:GITHUB_TOKEN}'
   pegboard install mcp notion=https://mcp.notion.com/mcp --agent claude-code
@@ -77,14 +77,14 @@ github.com/owner/repo//ruta?ref=v1, una URL git, ./ruta local o pegboard.`,
 			}
 			c := ctxs[0]
 			if len(c.targets) == 0 {
-				return fmt.Errorf("no hay agentes detectados en alcance %s", scope)
+				return fmt.Errorf("no agents detected in %s scope", scope)
 			}
 			origin := state.Adhoc
 			if save {
 				origin = state.Declared
 			}
-			es := engine.Scope{Scope: scope, State: c.state, Resolver: c.resolver()}
-			// Con --save las skills quedan fijadas en el lock del stack.
+			engScope := engine.Scope{Scope: scope, State: c.state, Resolver: c.resolver()}
+			// With --save, skills are pinned in the stack's lock.
 			var lock *skills.Lock
 			if save && len(sources) > 0 {
 				if lock, err = skills.LoadLock(filepath.Join(filepath.Dir(stack.Path(env, scope)), skills.LockFile)); err != nil {
@@ -99,13 +99,13 @@ github.com/owner/repo//ruta?ref=v1, una URL git, ./ruta local o pegboard.`,
 			for _, sk := range resolved {
 				for _, d := range c.state.SkillDirs() {
 					if e, ok := c.state.Skill(d, sk.Name); ok && e.Origin == state.Declared && !save {
-						return fmt.Errorf("la skill %s está declarada en %s; cámbiala ahí o usa --save", sk.Name, stack.FileName)
+						return fmt.Errorf("skill %s is declared in %s; change it there or use --save", sk.Name, stack.FileName)
 					}
 				}
 				skillWants[sk.Name] = &engine.SkillWant{Skill: sk, Origin: origin}
 			}
 			if len(skillWants) > 0 {
-				es.Skills = c.skillDirs(func(agent.Target) map[string]*engine.SkillWant { return skillWants }, nil)
+				engScope.Skills = c.skillDirs(func(agent.Target) map[string]*engine.SkillWant { return skillWants }, nil)
 			}
 			for _, t := range c.targets {
 				if len(order) == 0 {
@@ -118,11 +118,11 @@ github.com/owner/repo//ruta?ref=v1, una URL git, ./ruta local o pegboard.`,
 				wants := map[string]*engine.Want{}
 				for _, name := range order {
 					if e, ok := c.state.Get(t.ID(), name); ok && e.Origin == state.Declared && !save {
-						return fmt.Errorf("mcp %s está declarado en %s; cámbialo ahí o usa --save", name, stack.FileName)
+						return fmt.Errorf("mcp %s is declared in %s; change it there or use --save", name, stack.FileName)
 					}
 					wants[name] = &engine.Want{MCP: mcps[name], Origin: origin}
 				}
-				es.Targets = append(es.Targets, engine.Target{Target: t, Provider: p, Wants: wants})
+				engScope.Targets = append(engScope.Targets, engine.Target{Target: t, Provider: p, Wants: wants})
 			}
 			var after func() error
 			if save {
@@ -156,19 +156,19 @@ github.com/owner/repo//ruta?ref=v1, una URL git, ./ruta local o pegboard.`,
 						}
 					}
 					if !opts.json {
-						fmt.Fprintf(cmd.OutOrStdout(), "Guardado en %s.\n", env.Pretty(stack.Path(env, scope)))
+						fmt.Fprintf(cmd.OutOrStdout(), "Saved to %s.\n", env.Pretty(stack.Path(env, scope)))
 					}
 					return nil
 				}
 			}
-			return execute(cmd, opts, env, []engine.Scope{es}, nil, f, true, after)
+			return execute(cmd, opts, env, []engine.Scope{engScope}, nil, f, true, after)
 		},
 	}
-	cmd.Flags().StringArrayVar(&envs, "env", nil, "variable para los MCPs stdio: K=V (repetible; V puede ser ${env:X})")
-	cmd.Flags().StringArrayVar(&headers, "header", nil, "header para los MCPs http: K=V (repetible)")
-	cmd.Flags().BoolVar(&save, "save", false, "agregarlo también a pegboard.yaml")
-	cmd.Flags().BoolVarP(&f.yes, "yes", "y", false, "no pedir confirmación")
-	cmd.Flags().BoolVar(&f.force, "force", false, "sobrescribir lo que ya exista")
+	cmd.Flags().StringArrayVar(&envs, "env", nil, "variable for stdio MCPs: K=V (repeatable; V may be ${env:X})")
+	cmd.Flags().StringArrayVar(&headers, "header", nil, "header for http MCPs: K=V (repeatable)")
+	cmd.Flags().BoolVar(&save, "save", false, "also add it to pegboard.yaml")
+	cmd.Flags().BoolVarP(&f.yes, "yes", "y", false, "do not ask for confirmation")
+	cmd.Flags().BoolVar(&f.force, "force", false, "overwrite anything that already exists")
 	return cmd
 }
 
@@ -181,12 +181,12 @@ func appendUnique(l []string, s string) []string {
 	return append(l, s)
 }
 
-// parseInstall lee `mcp a=… b=… skill x y mcp c=…`. Los stacks remotos
-// llegan en la fase 3.
+// parseInstall reads `mcp a=… b=… skill x y mcp c=…`. Remote stacks arrive
+// in phase 3.
 func parseInstall(args, envs, headers []string) (map[string]mcp.MCP, []string, []string, error) {
 	mcps, order, sources, err := parseInstallArgs(args, envs, headers)
 	if err == nil && len(order) == 0 && len(sources) == 0 {
-		err = errors.New("nada que instalar")
+		err = errors.New("nothing to install")
 	}
 	return mcps, order, sources, err
 }
@@ -212,10 +212,10 @@ func parseInstallArgs(args, envs, headers []string) (map[string]mcp.MCP, []strin
 			for ; i < len(args) && strings.Contains(args[i], "="); i++ {
 				name, val, _ := strings.Cut(args[i], "=")
 				if !nameRe.MatchString(name) {
-					return nil, nil, nil, fmt.Errorf("nombre de mcp inválido %q", name)
+					return nil, nil, nil, fmt.Errorf("invalid mcp name %q", name)
 				}
 				if _, dup := out[name]; dup {
-					return nil, nil, nil, fmt.Errorf("mcp %s repetido", name)
+					return nil, nil, nil, fmt.Errorf("mcp %s is repeated", name)
 				}
 				var m mcp.MCP
 				if strings.HasPrefix(val, "http://") || strings.HasPrefix(val, "https://") {
@@ -227,7 +227,7 @@ func parseInstallArgs(args, envs, headers []string) (map[string]mcp.MCP, []strin
 						return nil, nil, nil, fmt.Errorf("mcp %s: %w", name, err)
 					}
 					if len(words) == 0 {
-						return nil, nil, nil, fmt.Errorf("mcp %s: falta el comando", name)
+						return nil, nil, nil, fmt.Errorf("mcp %s: missing command", name)
 					}
 					m = mcp.MCP{Command: words[0], Args: words[1:], Env: env}
 					if len(m.Args) == 0 {
@@ -245,7 +245,7 @@ func parseInstallArgs(args, envs, headers []string) (map[string]mcp.MCP, []strin
 				n++
 			}
 			if n == 0 {
-				return nil, nil, nil, errors.New("mcp necesita nombre=comando o nombre=url")
+				return nil, nil, nil, errors.New("mcp requires name=command or name=url")
 			}
 		case kw == "skill":
 			i++
@@ -258,19 +258,19 @@ func parseInstallArgs(args, envs, headers []string) (map[string]mcp.MCP, []strin
 				n++
 			}
 			if n == 0 {
-				return nil, nil, nil, errors.New("skill necesita una fuente (owner/repo, owner/repo@skill, ./ruta…)")
+				return nil, nil, nil, errors.New("skill requires a source (owner/repo, owner/repo@skill, ./path…)")
 			}
 		case strings.Contains(kw, "/"):
-			return nil, nil, nil, errors.New("instalar stacks remotos llega en la fase 3")
+			return nil, nil, nil, errors.New("installing remote stacks arrives in phase 3")
 		default:
-			return nil, nil, nil, fmt.Errorf("esperaba `mcp nombre=…`, no %q", kw)
+			return nil, nil, nil, fmt.Errorf("expected `mcp name=…`, not %q", kw)
 		}
 	}
 	if env != nil && !usedEnv {
-		return nil, nil, nil, errors.New("--env solo aplica a MCPs stdio (nombre=comando)")
+		return nil, nil, nil, errors.New("--env only applies to stdio MCPs (name=command)")
 	}
 	if hdr != nil && !usedHdr {
-		return nil, nil, nil, errors.New("--header solo aplica a MCPs http (nombre=url)")
+		return nil, nil, nil, errors.New("--header only applies to http MCPs (name=url)")
 	}
 	return out, order, sources, nil
 }
@@ -293,15 +293,15 @@ func kvs(flag string, l []string) (map[string]string, error) {
 	for _, s := range l {
 		k, v, ok := strings.Cut(s, "=")
 		if !ok || k == "" {
-			return nil, fmt.Errorf("%s espera K=V, no %q", flag, s)
+			return nil, fmt.Errorf("%s expects K=V, not %q", flag, s)
 		}
 		out[k] = v
 	}
 	return out, nil
 }
 
-// splitWords separa un comando como lo haría un shell simple: espacios,
-// comillas simples y dobles, y \ para escapar.
+// splitWords splits a command the way a simple shell would: spaces, single
+// and double quotes, and \ for escaping.
 func splitWords(s string) ([]string, error) {
 	var words []string
 	var cur strings.Builder
@@ -335,7 +335,7 @@ func splitWords(s string) ([]string, error) {
 		}
 	}
 	if quote != 0 || esc {
-		return nil, errors.New("comillas sin cerrar")
+		return nil, errors.New("unterminated quotes")
 	}
 	if inWord {
 		words = append(words, cur.String())
@@ -346,8 +346,8 @@ func splitWords(s string) ([]string, error) {
 func newUninstallCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 	f := &applyFlags{}
 	cmd := &cobra.Command{
-		Use:   "uninstall [mcp <nombre>…] [skill <nombre>…]",
-		Short: "Quita algo instalado ad-hoc",
+		Use:   "uninstall [mcp <name>…] [skill <name>…]",
+		Short: "Remove something installed ad-hoc",
 		Args:  cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			byKind := map[string][]string{}
@@ -358,7 +358,7 @@ func newUninstallCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 					continue
 				}
 				if kind == "" {
-					return fmt.Errorf("esperaba `uninstall mcp|skill nombre…`, no %q", a)
+					return fmt.Errorf("expected `uninstall mcp|skill name…`, not %q", a)
 				}
 				byKind[kind] = append(byKind[kind], a)
 			}
@@ -379,7 +379,7 @@ func newUninstallCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 				return err
 			}
 			c := ctxs[0]
-			es := engine.Scope{Scope: scope, State: c.state, Resolver: c.resolver()}
+			engScope := engine.Scope{Scope: scope, State: c.state, Resolver: c.resolver()}
 			found := map[string]bool{}
 			for _, t := range c.targets {
 				p, ok := mcpProvider(t)
@@ -393,17 +393,17 @@ func newUninstallCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 						continue
 					}
 					if e.Origin == state.Declared {
-						return fmt.Errorf("mcp %s está declarado en %s: quítalo con `pegboard remove mcp %s` y corre apply", name, stack.FileName, name)
+						return fmt.Errorf("mcp %s is declared in %s: remove it with `pegboard remove mcp %s` and run apply", name, stack.FileName, name)
 					}
 					wants[name] = nil
 					found["mcp "+name] = true
 				}
 				if len(wants) > 0 {
-					es.Targets = append(es.Targets, engine.Target{Target: t, Provider: p, Wants: wants})
+					engScope.Targets = append(engScope.Targets, engine.Target{Target: t, Provider: p, Wants: wants})
 				}
 			}
 			var declaredErr error
-			es.Skills = c.skillDirs(func(t agent.Target) map[string]*engine.SkillWant {
+			engScope.Skills = c.skillDirs(func(t agent.Target) map[string]*engine.SkillWant {
 				out := map[string]*engine.SkillWant{}
 				for _, name := range byKind["skill"] {
 					e, ok := c.state.Skill(t.Paths.Skills, name)
@@ -411,7 +411,7 @@ func newUninstallCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 						continue
 					}
 					if e.Origin == state.Declared {
-						declaredErr = fmt.Errorf("la skill %s está declarada en %s: quítala con `pegboard remove skill %s` y corre apply", name, stack.FileName, name)
+						declaredErr = fmt.Errorf("skill %s is declared in %s: remove it with `pegboard remove skill %s` and run apply", name, stack.FileName, name)
 					}
 					out[name] = nil
 					found["skill "+name] = true
@@ -431,12 +431,12 @@ func newUninstallCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 			}
 			if len(missing) > 0 {
 				sort.Strings(missing)
-				return fmt.Errorf("pegboard no instaló en alcance %s: %s", scope, strings.Join(missing, ", "))
+				return fmt.Errorf("pegboard did not install in scope %s: %s", scope, strings.Join(missing, ", "))
 			}
-			return execute(cmd, opts, env, []engine.Scope{es}, nil, f, true, nil)
+			return execute(cmd, opts, env, []engine.Scope{engScope}, nil, f, true, nil)
 		},
 	}
-	cmd.Flags().BoolVarP(&f.yes, "yes", "y", false, "no pedir confirmación")
-	cmd.Flags().BoolVar(&f.force, "force", false, "quitar aunque se haya editado a mano")
+	cmd.Flags().BoolVarP(&f.yes, "yes", "y", false, "do not ask for confirmation")
+	cmd.Flags().BoolVar(&f.force, "force", false, "remove even if it was edited by hand")
 	return cmd
 }

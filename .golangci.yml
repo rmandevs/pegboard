@@ -14,7 +14,7 @@ linters:
           disabled: true
   exclusions:
     rules:
-      # Escribir a stdout/stderr de la CLI no tiene un error útil que manejar.
+      # Writing to the CLI stdout/stderr has no useful error to handle.
       - linters: [errcheck]
         text: "fmt.Fprint"
 formatters:

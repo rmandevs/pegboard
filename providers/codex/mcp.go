@@ -14,13 +14,13 @@ func (Provider) MCPFile(t agent.Target) native.File {
 	return native.File{Path: t.Paths.MCPs, Format: native.TOML, Container: "mcp_servers"}
 }
 
-// Codex no interpola variables en config.toml, pero tiene llaves para
-// tomarlas del entorno:
-//   - env_vars = ["K"]: reenvía K al servidor stdio (para K: ${env:K}).
+// Codex does not interpolate variables in config.toml, but it has keys to
+// take them from the environment:
+//   - env_vars = ["K"]: forwards K to the stdio server (for K: ${env:K}).
 //   - bearer_token_env_var = "K": Authorization: Bearer ${env:K}.
 //   - env_http_headers = { H = "K" }: H: ${env:K}.
 //
-// Cualquier otra referencia se resuelve y queda en claro.
+// Any other reference is resolved and left in plain text.
 func (Provider) EncodeMCP(m mcp.MCP, enc *agent.Encoder) (*native.Obj, error) {
 	o := native.NewObj()
 	if m.Remote() {

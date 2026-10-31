@@ -7,13 +7,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// yamlDoc edita un YAML con el árbol de nodos de yaml.v3, que conserva los
-// comentarios. El codificador sí normaliza la indentación (2 espacios).
+// yamlDoc edits YAML with yaml.v3's node tree, which preserves comments. The
+// encoder does normalize indentation (2 spaces).
 type yamlDoc struct {
 	src     []byte
 	exists  bool
 	file    File
-	root    *yaml.Node // mapping raíz
+	root    *yaml.Node // root mapping
 	doc     *yaml.Node
 	changed bool
 }
@@ -28,7 +28,7 @@ func openYAML(src []byte, exists bool, f File) (Doc, error) {
 		doc = yaml.Node{Kind: yaml.DocumentNode, Content: []*yaml.Node{{Kind: yaml.MappingNode, Tag: "!!map"}}}
 	}
 	if len(doc.Content) != 1 || doc.Content[0].Kind != yaml.MappingNode {
-		return nil, fmt.Errorf("la raíz no es un mapa: %w", ErrUnsupported)
+		return nil, fmt.Errorf("the root is not a mapping: %w", ErrUnsupported)
 	}
 	d.doc, d.root = &doc, doc.Content[0]
 	return d, nil
@@ -36,7 +36,7 @@ func openYAML(src []byte, exists bool, f File) (Doc, error) {
 
 func (d *yamlDoc) Exists() bool { return d.exists }
 
-// lookup busca la llave en un mapping y devuelve el índice del nodo llave.
+// lookup finds the key in a mapping and returns the index of its key node.
 func lookup(m *yaml.Node, key string) int {
 	for i := 0; i+1 < len(m.Content); i += 2 {
 		if m.Content[i].Value == key {
@@ -57,10 +57,10 @@ func (d *yamlDoc) container(create bool) (*yaml.Node, error) {
 			*c = yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
 		}
 		if c.Kind != yaml.MappingNode {
-			return nil, fmt.Errorf("%s no es un mapa: %w", d.file.Container, ErrUnsupported)
+			return nil, fmt.Errorf("%s is not a mapping: %w", d.file.Container, ErrUnsupported)
 		}
 		if create {
-			// `mcps: {}` pasa a estilo bloque al agregarle entradas.
+			// `mcps: {}` switches to block style when entries are added.
 			c.Style &^= yaml.FlowStyle
 		}
 		return c, nil
@@ -141,8 +141,8 @@ func strNode(s string) *yaml.Node {
 	return n
 }
 
-// toNode convierte un árbol (Obj, strings, listas) a nodos YAML, conservando
-// el orden de llaves del Obj.
+// toNode converts a tree (Obj, strings, lists) into YAML nodes, preserving
+// the Obj's key order.
 func toNode(v any) (*yaml.Node, error) {
 	switch x := v.(type) {
 	case *Obj:
@@ -169,8 +169,8 @@ func toNode(v any) (*yaml.Node, error) {
 	return n, nil
 }
 
-// ListDoc es un Doc YAML que además edita listas de strings de primer nivel
-// (skills: en pegboard.yaml).
+// ListDoc is a YAML Doc that also edits top-level string lists (skills: in
+// pegboard.yaml).
 type ListDoc interface {
 	Doc
 	StringList(key string) []string
@@ -201,7 +201,7 @@ func (d *yamlDoc) SetStringList(key string, l []string) error {
 		return nil
 	}
 	if i >= 0 {
-		// Conservar el estilo (en línea o bloque) que ya tenía.
+		// Keep the style (flow or block) it already had.
 		n.Style = d.root.Content[i+1].Style
 		d.root.Content[i+1] = n
 		return nil

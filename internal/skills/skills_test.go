@@ -23,8 +23,8 @@ func TestParse(t *testing.T) {
 		{"https://github.com/o/r/tree/main/skills/x", Git, "https://github.com/o/r.git", "skills/x", "main", ""},
 		{"https://git.example.com/a/b.git//skills?ref=abc", Git, "https://git.example.com/a/b.git", "skills", "abc", ""},
 		{"git@github.com:o/r.git", Git, "git@github.com:o/r.git", "", "", ""},
-		{"./skills/mia", Local, "", "", "", ""},
-		{"~/skills/mia", Local, "", "", "", ""},
+		{"./skills/mine", Local, "", "", "", ""},
+		{"~/skills/mine", Local, "", "", "", ""},
 		{"pegboard", Builtin, "", "", "", ""},
 	}
 	for _, c := range cases {
@@ -37,9 +37,9 @@ func TestParse(t *testing.T) {
 			t.Errorf("%s: %+v", c.in, s)
 		}
 	}
-	for _, bad := range []string{"", "solo", "o/r@mal nombre", "o/r?ref=", "https://github.com/o/r/tree/main?ref=x"} {
+	for _, bad := range []string{"", "alone", "o/r@bad name", "o/r?ref=", "https://github.com/o/r/tree/main?ref=x"} {
 		if _, err := Parse(bad); err == nil {
-			t.Errorf("%q debía fallar", bad)
+			t.Errorf("%q should fail", bad)
 		}
 	}
 }
@@ -62,7 +62,7 @@ func TestDiscover(t *testing.T) {
 	write(t, root, map[string]string{
 		"skills/tdd/SKILL.md":            "---\nname: tdd\ndescription: x\n---\n# TDD",
 		"skills/cat/review/SKILL.md":     "---\nname: code-review\n---\n",
-		"skills/cat/review/sub/SKILL.md": "sombreada por la de arriba",
+		"skills/cat/review/sub/SKILL.md": "shadowed by the one above",
 		"README.md":                      "x",
 	})
 	found, err := Discover(root)
@@ -73,22 +73,22 @@ func TestDiscover(t *testing.T) {
 		t.Fatalf("%v", found)
 	}
 	single := t.TempDir()
-	write(t, single, map[string]string{"SKILL.md": "# sin frontmatter"})
+	write(t, single, map[string]string{"SKILL.md": "# without frontmatter"})
 	if f, err := Discover(single); err != nil || f[filepath.Base(single)] == "" {
-		t.Fatalf("raíz: %v %v", f, err)
+		t.Fatalf("root: %v %v", f, err)
 	}
 	deep := t.TempDir()
 	write(t, deep, map[string]string{"a/b/c/d/x/SKILL.md": "---\nname: x\n---"})
 	if f, err := Discover(deep); err != nil || f["x"] == "" {
-		t.Fatalf("búsqueda completa: %v %v", f, err)
+		t.Fatalf("full search: %v %v", f, err)
 	}
 	if _, err := Discover(t.TempDir()); err == nil {
-		t.Error("sin skills debía fallar")
+		t.Error("without skills it should fail")
 	}
 	dup := t.TempDir()
 	write(t, dup, map[string]string{"skills/a/SKILL.md": "---\nname: x\n---", "skills/b/SKILL.md": "---\nname: x\n---"})
-	if _, err := Discover(dup); err == nil || !strings.Contains(err.Error(), "dos skills") {
-		t.Errorf("duplicadas: %v", err)
+	if _, err := Discover(dup); err == nil || !strings.Contains(err.Error(), "two skills") {
+		t.Errorf("duplicates: %v", err)
 	}
 }
 
@@ -99,19 +99,20 @@ func TestHashStable(t *testing.T) {
 	ha, _ := Hash(a)
 	hb, _ := Hash(b)
 	if ha != hb {
-		t.Error("el hash no debía depender del orden de creación")
+		t.Error("the hash should not depend on creation order")
 	}
 	write(t, b, map[string]string{"SKILL.md": "z"})
 	if hb2, _ := Hash(b); hb2 == ha {
-		t.Error("el hash debía cambiar con el contenido")
+		t.Error("the hash should change with content")
 	}
 }
 
-// repo crea un repo git local con los archivos dados y devuelve su URL file://.
+// repo creates a local git repo with the given files and returns its file://
+// URL.
 func repo(t *testing.T, files map[string]string) (string, func(map[string]string) string) {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git no está instalado")
+		t.Skip("git is not installed")
 	}
 	dir := t.TempDir()
 	gitRun := func(args ...string) string {
@@ -163,32 +164,33 @@ func TestResolveGitAndLock(t *testing.T) {
 	}
 	v1 := got[1].Hash
 
-	// El repo avanza; con lock se sigue usando lo fijado, sin red.
+	// The repo moves on; with a lock the pinned version is still used,
+	// without network.
 	commit(map[string]string{"skills/tdd/SKILL.md": "---\nname: tdd\n---\nv2"})
 	offline := &Resolver{Cache: cache, Lock: lock, Git: func(string, ...string) (string, error) {
-		t.Fatal("con lock y caché no debía usar git")
+		t.Fatal("with a lock and cache it should not use git")
 		return "", nil
 	}}
 	got, err = offline.Resolve(src)
 	if err != nil || got[1].Hash != v1 {
-		t.Fatalf("fijado: %+v %v", got, err)
+		t.Fatalf("pinned: %+v %v", got, err)
 	}
 
-	// Sin caché, vuelve a bajar el commit fijado (no la punta de main).
+	// Without cache, it downloads the pinned commit again (not main's tip).
 	r2 := &Resolver{Cache: t.TempDir(), Lock: lock}
 	got, err = r2.Resolve(src)
 	if err != nil || got[1].Hash != v1 {
-		t.Fatalf("commit fijado: %+v %v", got, err)
+		t.Fatalf("pinned commit: %+v %v", got, err)
 	}
 
-	// update ignora el lock.
+	// update ignores the lock.
 	up := &Resolver{Cache: cache, Lock: lock, Update: true}
 	got, err = up.Resolve(src)
 	if err != nil || got[1].Hash == v1 || !lock.Changed() {
 		t.Fatalf("update: %+v %v", got, err)
 	}
 
-	// Una sola skill con @.
+	// A single skill with @.
 	one, err := Parse(strings.Replace(url, "file://", "file://", 1))
 	if err != nil {
 		t.Fatal(err)
@@ -199,8 +201,8 @@ func TestResolveGitAndLock(t *testing.T) {
 		t.Fatalf("@skill: %+v %v", got, err)
 	}
 	one.Skill = "nope"
-	if _, err := (&Resolver{Cache: cache}).Resolve(one); err == nil || !strings.Contains(err.Error(), "tiene: review, tdd") {
-		t.Errorf("skill inexistente: %v", err)
+	if _, err := (&Resolver{Cache: cache}).Resolve(one); err == nil || !strings.Contains(err.Error(), "available: review, tdd") {
+		t.Errorf("missing skill: %v", err)
 	}
 }
 
@@ -212,20 +214,20 @@ func TestResolveIntegrity(t *testing.T) {
 		t.Fatal(err)
 	}
 	ls := lock.Sources[src.Raw]
-	ls.Skills["x"] = "sha256:otro"
+	ls.Skills["x"] = "sha256:other"
 	lock.Sources[src.Raw] = ls
 	_, err := (&Resolver{Cache: t.TempDir(), Lock: lock}).Resolve(src)
-	if err == nil || !strings.Contains(err.Error(), "no coincide con pegboard.lock") {
-		t.Fatalf("debía detectar contenido distinto al lock: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "does not match pegboard.lock") {
+		t.Fatalf("it should detect content different from the lock: %v", err)
 	}
 }
 
 func TestResolveLocalAndBuiltin(t *testing.T) {
 	base := t.TempDir()
-	write(t, base, map[string]string{"skills/mia/SKILL.md": "---\nname: mia\n---"})
-	src, _ := Parse("./skills/mia")
+	write(t, base, map[string]string{"skills/mine/SKILL.md": "---\nname: mine\n---"})
+	src, _ := Parse("./skills/mine")
 	got, err := (&Resolver{Cache: t.TempDir(), BaseDir: base}).Resolve(src)
-	if err != nil || len(got) != 1 || !got[0].Local || got[0].Dir != filepath.Join(base, "skills", "mia") {
+	if err != nil || len(got) != 1 || !got[0].Local || got[0].Dir != filepath.Join(base, "skills", "mine") {
 		t.Fatalf("%+v %v", got, err)
 	}
 	b, _ := Parse("pegboard")

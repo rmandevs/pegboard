@@ -20,7 +20,7 @@ import (
 func newInitCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 	return &cobra.Command{
 		Use:   "init",
-		Short: "Crea pegboard.yaml con los agentes detectados",
+		Short: "Create pegboard.yaml with the detected agents",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			env, err := newEnv(opts.dir)
@@ -31,7 +31,7 @@ func newInitCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 			if opts.scope != "" {
 				scopes, ok := agent.ParseScope(opts.scope)
 				if !ok {
-					return fmt.Errorf("--scope %q inválido: usa global o project", opts.scope)
+					return fmt.Errorf("--scope %q is invalid: use global or project", opts.scope)
 				}
 				scope = scopes[0]
 			}
@@ -41,7 +41,7 @@ func newInitCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 			}
 			path := stack.Path(env, scope)
 			if agent.Exists(path) {
-				return fmt.Errorf("%s ya existe", env.Pretty(path))
+				return fmt.Errorf("%s already exists", env.Pretty(path))
 			}
 			var agents []string
 			seen := map[string]bool{}
@@ -54,7 +54,7 @@ func newInitCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 			if _, err := stack.Edit(path, agents); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Creado %s (agentes: %s).\n", env.Pretty(path), orNone(agents))
+			fmt.Fprintf(cmd.OutOrStdout(), "Created %s (agents: %s).\n", env.Pretty(path), orNone(agents))
 			return nil
 		},
 	}
@@ -62,12 +62,12 @@ func newInitCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 
 func orNone(l []string) string {
 	if len(l) == 0 {
-		return "ninguno detectado"
+		return "none detected"
 	}
 	return strings.Join(l, ", ")
 }
 
-// applyFlags son las banderas de los comandos que escriben.
+// applyFlags are the flags of commands that write.
 type applyFlags struct {
 	yes        bool
 	force      bool
@@ -79,15 +79,15 @@ func newPlanCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 	f := &applyFlags{}
 	cmd := &cobra.Command{
 		Use:   "plan",
-		Short: "Muestra lo que cambiaría; no escribe nada",
+		Short: "Show what would change; writes nothing",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runDeclarative(cmd, opts, newEnv, f, false)
 		},
 	}
-	cmd.Flags().BoolVar(&f.exitCode, "exit-code", false, "salir con 2 si hay cambios")
-	cmd.Flags().BoolVar(&f.force, "force", false, "mostrar el plan resolviendo conflictos a favor de pegboard.yaml")
-	cmd.Flags().BoolVar(&f.pruneAdhoc, "prune-adhoc", false, "incluir quitar lo instalado ad-hoc")
+	cmd.Flags().BoolVar(&f.exitCode, "exit-code", false, "exit with 2 if there are changes")
+	cmd.Flags().BoolVar(&f.force, "force", false, "show the plan resolving conflicts in favor of pegboard.yaml")
+	cmd.Flags().BoolVar(&f.pruneAdhoc, "prune-adhoc", false, "also remove ad-hoc installed entries")
 	return cmd
 }
 
@@ -95,15 +95,15 @@ func newApplyCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 	f := &applyFlags{}
 	cmd := &cobra.Command{
 		Use:   "apply",
-		Short: "Aplica el plan (pide confirmación sin -y)",
+		Short: "Apply the plan (asks for confirmation without -y)",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runDeclarative(cmd, opts, newEnv, f, true)
 		},
 	}
-	cmd.Flags().BoolVarP(&f.yes, "yes", "y", false, "no pedir confirmación")
-	cmd.Flags().BoolVar(&f.force, "force", false, "sobrescribir lo editado a mano")
-	cmd.Flags().BoolVar(&f.pruneAdhoc, "prune-adhoc", false, "quitar también lo instalado ad-hoc")
+	cmd.Flags().BoolVarP(&f.yes, "yes", "y", false, "do not ask for confirmation")
+	cmd.Flags().BoolVar(&f.force, "force", false, "overwrite content edited by hand")
+	cmd.Flags().BoolVar(&f.pruneAdhoc, "prune-adhoc", false, "also remove ad-hoc installed entries")
 	return cmd
 }
 
@@ -120,12 +120,12 @@ func runDeclarative(cmd *cobra.Command, opts *options, newEnv EnvFunc, f *applyF
 	var warnings []string
 	var afters []func() error
 	for _, c := range ctxs {
-		es, w, after, err := c.declarative(f.pruneAdhoc)
+		engScope, w, after, err := c.declarative(f.pruneAdhoc)
 		warnings = append(warnings, w...)
 		if err != nil {
 			return err
 		}
-		scopes = append(scopes, es)
+		scopes = append(scopes, engScope)
 		afters = append(afters, after)
 	}
 	return execute(cmd, opts, env, scopes, warnings, f, apply, func() error {
@@ -138,13 +138,13 @@ func runDeclarative(cmd *cobra.Command, opts *options, newEnv EnvFunc, f *applyF
 	})
 }
 
-// execute calcula el plan, lo muestra y, si apply, lo aplica tras confirmar.
-// after corre solo si se aplicó.
+// execute computes the plan, shows it, and, if apply, applies it after
+// confirmation. after runs only if it was applied.
 func execute(cmd *cobra.Command, opts *options, env agent.Env, scopes []engine.Scope, warnings []string,
 	f *applyFlags, apply bool, after func() error) error {
 	out := cmd.OutOrStdout()
 	if apply && opts.json && !f.yes {
-		return errors.New("--json necesita -y: no hay a quién preguntar")
+		return errors.New("--json requires -y: there is no one to ask")
 	}
 	plan, err := engine.Compute(scopes, engine.Options{Force: f.force})
 	if err != nil {
@@ -184,7 +184,7 @@ func execute(cmd *cobra.Command, opts *options, env agent.Env, scopes []engine.S
 		return err
 	}
 	for _, w := range warnings {
-		fmt.Fprintln(cmd.ErrOrStderr(), "aviso:", w)
+		fmt.Fprintln(cmd.ErrOrStderr(), "warning:", w)
 	}
 	plan.WriteText(out, env.Pretty)
 	if !apply {
@@ -203,7 +203,7 @@ func execute(cmd *cobra.Command, opts *options, env agent.Env, scopes []engine.S
 		return engine.ErrBlocked
 	}
 	if !plan.Empty() && !f.yes && !confirm(cmd.InOrStdin(), out) {
-		fmt.Fprintln(out, "Cancelado; no se escribió nada.")
+		fmt.Fprintln(out, "Canceled; nothing was written.")
 		return nil
 	}
 	r, err := engine.Apply(plan, backupDir(env), env.Now())
@@ -211,9 +211,9 @@ func execute(cmd *cobra.Command, opts *options, env agent.Env, scopes []engine.S
 		return err
 	}
 	for _, w := range r.Written {
-		line := "Escrito " + env.Pretty(w.File)
+		line := "Wrote " + env.Pretty(w.File)
 		if w.Backup != "" {
-			line += " (respaldo: " + env.Pretty(w.Backup) + ")"
+			line += " (backup: " + env.Pretty(w.Backup) + ")"
 		}
 		fmt.Fprintln(out, line)
 	}
@@ -226,10 +226,10 @@ func execute(cmd *cobra.Command, opts *options, env agent.Env, scopes []engine.S
 func backupDir(env agent.Env) string { return env.StateDir() + string(os.PathSeparator) + "backups" }
 
 func confirm(in io.Reader, out io.Writer) bool {
-	fmt.Fprint(out, "¿Aplicar? [s/N] ")
+	fmt.Fprint(out, "Apply? [y/N] ")
 	line, _ := bufio.NewReader(in).ReadString('\n')
 	switch strings.ToLower(strings.TrimSpace(line)) {
-	case "s", "si", "sí", "y", "yes":
+	case "y", "yes":
 		return true
 	}
 	return false
@@ -239,7 +239,7 @@ func newDriftCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 	var exit, strict bool
 	cmd := &cobra.Command{
 		Use:   "drift",
-		Short: "Compara el estado con los archivos reales",
+		Short: "Compare state with the real files",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			env, err := newEnv(opts.dir)
@@ -283,7 +283,7 @@ func newDriftCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 			} else {
 				engine.WriteDriftText(cmd.OutOrStdout(), items, env.Pretty)
 				if strict && drift > 0 {
-					fmt.Fprintln(cmd.OutOrStdout(), "--strict: lo ad-hoc cuenta como drift.")
+					fmt.Fprintln(cmd.OutOrStdout(), "--strict: ad-hoc entries count as drift.")
 				}
 			}
 			if exit && drift > 0 {
@@ -292,8 +292,8 @@ func newDriftCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&exit, "exit-code", false, "salir con 2 si hay drift")
-	cmd.Flags().BoolVar(&strict, "strict", false, "contar lo ad-hoc como drift")
+	cmd.Flags().BoolVar(&exit, "exit-code", false, "exit with 2 if there is drift")
+	cmd.Flags().BoolVar(&strict, "strict", false, "count ad-hoc entries as drift")
 	return cmd
 }
 

@@ -9,11 +9,12 @@ import (
 	"github.com/rmandevs/agents-casc/internal/state"
 )
 
-// ContextFile es un archivo de contexto que el stack garantiza.
-//   - Line == "": el archivo debe existir; si falta se crea con Template.
-//     Nunca se borra: después de crearlo es del usuario.
-//   - Line != "": el archivo debe tener esa línea (el puente @AGENTS.md en
-//     CLAUDE.md). Si pegboard la agregó y ya no se quiere, la quita.
+// ContextFile is a context file the stack guarantees.
+//   - Line == "": the file must exist; if missing, it is created with
+//     Template. It is never deleted: once created it belongs to the user.
+//   - Line != "": the file must contain that line (the @AGENTS.md bridge in
+//     CLAUDE.md). If pegboard added it and it is no longer wanted, it
+//     removes it.
 type ContextFile struct {
 	Path     string
 	Target   string
@@ -51,7 +52,7 @@ func (p *Plan) context(sc Scope, cf ContextFile) error {
 		p.Changes = append(p.Changes, c)
 		return nil
 	}
-	c.Name = cf.Line + " en " + baseName(cf.Path)
+	c.Name = cf.Line + " in " + baseName(cf.Path)
 	_, managed := sc.State.Context[cf.Path]
 	present := hasLine(content, cf.Line)
 	line := cf.Line
@@ -84,7 +85,7 @@ func (p *Plan) context(sc Scope, cf ContextFile) error {
 		}
 		c.commit = func(s *state.State) { delete(s.Context, path) }
 	case !cf.Want && managed:
-		c.Action, c.Reason = Forget, "ya no estaba"
+		c.Action, c.Reason = Forget, "no longer present"
 		c.commit = func(s *state.State) { delete(s.Context, path) }
 	default:
 		return nil
@@ -101,7 +102,7 @@ func setContext(s *state.State, path, line string) {
 	s.Context[path] = state.ContextEntry{Line: line}
 }
 
-// removeLine quita la línea (y una línea en blanco que la preceda).
+// removeLine removes the line (and one blank line before it).
 func removeLine(content, line string) string {
 	lines := strings.Split(content, "\n")
 	var out []string

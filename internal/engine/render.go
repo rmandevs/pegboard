@@ -12,13 +12,13 @@ var symbols = map[Action]string{
 	Create: "+", Update: "~", Delete: "-", Forget: "-", Conflict: "!", Adopt: "=",
 }
 
-// Pretty abrevia rutas para mostrarlas.
+// Pretty shortens paths for display.
 type Pretty func(string) string
 
-// WriteText escribe el plan como en SPEC §6.
+// WriteText writes the plan as in SPEC §6.
 func (p *Plan) WriteText(w io.Writer, pretty Pretty) {
 	if p.Empty() {
-		fmt.Fprintln(w, "Sin cambios: cada herramienta está en su silueta.")
+		fmt.Fprintln(w, "No changes: every tool is in its silhouette.")
 		return
 	}
 	width := 0
@@ -48,9 +48,9 @@ func (p *Plan) WriteText(w io.Writer, pretty Pretty) {
 		}
 		switch {
 		case c.Action == Conflict && c.do == Update:
-			detail += " (--force: se sobrescribe)"
+			detail += " (--force: overwrite)"
 		case c.Action == Conflict && c.do == Delete:
-			detail += " (--force: se quita)"
+			detail += " (--force: remove)"
 		}
 		if c.Origin == state.Adhoc {
 			detail += " [ad-hoc]"
@@ -61,10 +61,10 @@ func (p *Plan) WriteText(w io.Writer, pretty Pretty) {
 		}
 	}
 	s := p.Summary()
-	line := fmt.Sprintf("Plan: %d crear, %d modificar, %d quitar, %d %s",
-		s[Create], s[Update], s[Delete]+s[Forget], s[Conflict], plural(s[Conflict], "conflicto", "conflictos"))
+	line := fmt.Sprintf("Plan: %d create, %d update, %d remove, %d %s",
+		s[Create], s[Update], s[Delete]+s[Forget], s[Conflict], plural(s[Conflict], "conflict", "conflicts"))
 	if s[Adopt] > 0 {
-		line += fmt.Sprintf(", %d adoptar", s[Adopt])
+		line += fmt.Sprintf(", %d adopt", s[Adopt])
 	}
 	fmt.Fprintln(w, line+".")
 }
@@ -90,7 +90,7 @@ type changeJSON struct {
 	Warnings []string `json:"warnings"`
 }
 
-// PlanJSON es el formato estable de `plan --json`.
+// PlanJSON is the stable format of `plan --json`.
 type PlanJSON struct {
 	Changes  []changeJSON   `json:"changes"`
 	Summary  map[Action]int `json:"summary"`
@@ -98,7 +98,7 @@ type PlanJSON struct {
 	Warnings []string       `json:"warnings"`
 }
 
-// JSON arma la forma estable del plan. warnings son avisos generales.
+// JSON builds the stable form of the plan. warnings are general notices.
 func (p *Plan) JSON(warnings []string) PlanJSON {
 	out := PlanJSON{Changes: []changeJSON{}, Summary: map[Action]int{}, Blocked: p.Blocked(), Warnings: warnings}
 	if out.Warnings == nil {
@@ -130,7 +130,7 @@ func (p *Plan) JSON(warnings []string) PlanJSON {
 	return out
 }
 
-// WriteJSON escribe v indentado.
+// WriteJSON writes v indented.
 func WriteJSON(w io.Writer, v any) error {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
@@ -138,7 +138,7 @@ func WriteJSON(w io.Writer, v any) error {
 	return enc.Encode(v)
 }
 
-// WriteDriftText lista el drift; los ad-hoc van aparte.
+// WriteDriftText lists drift; ad-hoc entries are shown separately.
 func WriteDriftText(w io.Writer, items []DriftItem, pretty Pretty) {
 	var managed, adhoc []DriftItem
 	for _, it := range items {
@@ -148,7 +148,7 @@ func WriteDriftText(w io.Writer, items []DriftItem, pretty Pretty) {
 			managed = append(managed, it)
 		}
 	}
-	label := map[DriftKind]string{InSync: "ok", Edited: "editado a mano", Missing: "borrado a mano"}
+	label := map[DriftKind]string{InSync: "ok", Edited: "edited manually", Missing: "deleted manually"}
 	section := func(title string, list []DriftItem) {
 		if len(list) == 0 {
 			return
@@ -159,11 +159,11 @@ func WriteDriftText(w io.Writer, items []DriftItem, pretty Pretty) {
 		}
 	}
 	if len(items) == 0 {
-		fmt.Fprintln(w, "pegboard no ha escrito nada todavía.")
+		fmt.Fprintln(w, "pegboard has not written anything yet.")
 		return
 	}
-	section("Gestionado por pegboard:", managed)
-	section("Ad-hoc, no declarado:", adhoc)
+	section("Managed by pegboard:", managed)
+	section("Ad-hoc, not declared:", adhoc)
 	n := 0
 	for _, it := range items {
 		if it.Kind != InSync {
@@ -171,8 +171,8 @@ func WriteDriftText(w io.Writer, items []DriftItem, pretty Pretty) {
 		}
 	}
 	if n == 0 {
-		fmt.Fprintln(w, "Sin drift.")
+		fmt.Fprintln(w, "No drift.")
 	} else {
-		fmt.Fprintf(w, "Drift: %d %s.\n", n, plural(n, "entrada", "entradas"))
+		fmt.Fprintf(w, "Drift: %d %s.\n", n, plural(n, "entry", "entries"))
 	}
 }

@@ -1,4 +1,4 @@
-// Package cli arma los comandos de pegboard (SPEC §4).
+// Package cli builds the pegboard commands (SPEC §4).
 package cli
 
 import (
@@ -13,8 +13,8 @@ import (
 	"github.com/rmandevs/agents-casc/providers"
 )
 
-// Version se fija al compilar con -ldflags "-X …/internal/cli.Version=x.y.z";
-// con `go install …@vX` se toma de la info de compilación.
+// Version is set at build time with -ldflags "-X …/internal/cli.Version=x.y.z";
+// with `go install …@vX` it is taken from the build info.
 var Version = "dev"
 
 func version() string {
@@ -27,7 +27,7 @@ func version() string {
 	return Version
 }
 
-// EnvFunc construye el entorno para la carpeta de --dir.
+// EnvFunc builds the environment for the --dir directory.
 type EnvFunc func(dir string) (agent.Env, error)
 
 type options struct {
@@ -37,14 +37,14 @@ type options struct {
 	dir    string
 }
 
-// exitCode termina con un código sin mensaje de error (p. ej. 2 = hay
-// cambios con --exit-code).
+// exitCode terminates with a code but without an error message (for example,
+// 2 = there are changes with --exit-code).
 type exitCode int
 
-func (e exitCode) Error() string { return fmt.Sprintf("código de salida %d", int(e)) }
+func (e exitCode) Error() string { return fmt.Sprintf("exit code %d", int(e)) }
 
-// Run ejecuta pegboard con args y devuelve el código de salida: 0 sin
-// cambios, 2 hay cambios o drift (con --exit-code), 1 error.
+// Run executes pegboard with args and returns the exit code: 0 without
+// changes, 2 there are changes or drift (with --exit-code), 1 error.
 func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, newEnv EnvFunc) int {
 	root := newRoot(stdin, stdout, stderr, newEnv)
 	root.SetArgs(args)
@@ -63,7 +63,7 @@ func newRoot(stdin io.Reader, stdout, stderr io.Writer, newEnv EnvFunc) *cobra.C
 	opts := &options{}
 	root := &cobra.Command{
 		Use:           "pegboard",
-		Short:         "Configuration as Code para agentes",
+		Short:         "Configuration as Code for agents",
 		Version:       version(),
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -72,10 +72,10 @@ func newRoot(stdin io.Reader, stdout, stderr io.Writer, newEnv EnvFunc) *cobra.C
 	root.SetOut(stdout)
 	root.SetErr(stderr)
 	f := root.PersistentFlags()
-	f.StringVar(&opts.scope, "scope", "", "alcance: global o project (default: ambos)")
-	f.StringArrayVar(&opts.agents, "agent", nil, "limitar a un agente (repetible)")
-	f.BoolVar(&opts.json, "json", false, "salida JSON estable")
-	f.StringVar(&opts.dir, "dir", ".", "carpeta del proyecto")
+	f.StringVar(&opts.scope, "scope", "", "scope: global or project (default: both)")
+	f.StringArrayVar(&opts.agents, "agent", nil, "limit to one agent (repeatable)")
+	f.BoolVar(&opts.json, "json", false, "stable JSON output")
+	f.StringVar(&opts.dir, "dir", ".", "project directory")
 
 	root.AddCommand(
 		newAgentsCmd(opts, newEnv),
@@ -95,11 +95,11 @@ func newRoot(stdin io.Reader, stdout, stderr io.Writer, newEnv EnvFunc) *cobra.C
 	return root
 }
 
-// selection resuelve --scope y --agent.
+// selection resolves --scope and --agent.
 func (o *options) selection() ([]agent.Scope, []agent.Provider, error) {
 	scopes, ok := agent.ParseScope(o.scope)
 	if !ok {
-		return nil, nil, fmt.Errorf("--scope %q inválido: usa global o project", o.scope)
+		return nil, nil, fmt.Errorf("--scope %q is invalid: use global or project", o.scope)
 	}
 	if len(o.agents) == 0 {
 		return scopes, providers.All(), nil
@@ -109,7 +109,7 @@ func (o *options) selection() ([]agent.Scope, []agent.Provider, error) {
 	for _, id := range o.agents {
 		p, ok := providers.Get(id)
 		if !ok {
-			errs = append(errs, fmt.Errorf("agente desconocido %q", id))
+			errs = append(errs, fmt.Errorf("unknown agent %q", id))
 			continue
 		}
 		provs = append(provs, p)

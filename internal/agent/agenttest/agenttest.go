@@ -1,5 +1,5 @@
-// Package agenttest arma entornos falsos para probar providers sin tocar
-// la máquina real: todo vive en un t.TempDir().
+// Package agenttest builds fake environments to test providers without
+// touching the real machine: everything lives in a t.TempDir().
 package agenttest
 
 import (
@@ -12,12 +12,12 @@ import (
 	"github.com/rmandevs/agents-casc/internal/agent"
 )
 
-// Machine es una máquina falsa: un home, una carpeta de proyecto, binarios
-// en el PATH con su versión y variables de entorno.
+// Machine is a fake machine: a home directory, a project directory, binaries
+// on PATH with their versions, and environment variables.
 type Machine struct {
 	T    *testing.T
 	Root string
-	Bins map[string]string // nombre → versión ("" = no responde)
+	Bins map[string]string // name → version ("" = does not respond)
 	Vars map[string]string
 }
 
@@ -33,10 +33,10 @@ func New(t *testing.T) *Machine {
 func (m *Machine) Home() string    { return filepath.Join(m.Root, "home") }
 func (m *Machine) Project() string { return filepath.Join(m.Root, "proj") }
 
-// Path es una ruta dentro de la máquina falsa.
+// Path is a path inside the fake machine.
 func (m *Machine) Path(rel string) string { return filepath.Join(m.Root, rel) }
 
-// Mkdir crea una carpeta relativa a Root.
+// Mkdir creates a directory relative to Root.
 func (m *Machine) Mkdir(rel string) string {
 	m.T.Helper()
 	p := m.Path(rel)
@@ -46,7 +46,7 @@ func (m *Machine) Mkdir(rel string) string {
 	return p
 }
 
-// File crea un archivo relativo a Root, con sus carpetas.
+// File creates a file relative to Root, including its directories.
 func (m *Machine) File(rel, content string) string {
 	m.T.Helper()
 	p := m.Path(rel)
@@ -59,10 +59,10 @@ func (m *Machine) File(rel, content string) string {
 	return p
 }
 
-// BinPath es donde la máquina falsa dice que vive un binario.
+// BinPath is where the fake machine says a binary lives.
 func (m *Machine) BinPath(name string) string { return "/fake/bin/" + name }
 
-// Env construye el agent.Env de la máquina.
+// Env builds the agent.Env for the machine.
 func (m *Machine) Env() agent.Env {
 	return agent.Env{
 		Home:       m.Home(),
@@ -85,8 +85,8 @@ func (m *Machine) Env() agent.Env {
 	}
 }
 
-// EnvFunc es Env con la firma que espera la CLI; ignora --dir salvo que
-// apunte a otra carpeta.
+// EnvFunc is Env with the signature the CLI expects; it ignores --dir unless
+// it points to another directory.
 func (m *Machine) EnvFunc() func(string) (agent.Env, error) {
 	return func(dir string) (agent.Env, error) {
 		env := m.Env()

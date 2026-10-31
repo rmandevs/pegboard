@@ -1,5 +1,5 @@
-// Package engine calcula y aplica planes (SPEC §4): el mismo motor sirve al
-// modo declarativo (pegboard.yaml) y al ad-hoc (pegboard install).
+// Package engine computes and applies plans (SPEC §4): the same engine
+// serves declarative mode (pegboard.yaml) and ad-hoc mode (pegboard install).
 package engine
 
 import (
@@ -14,7 +14,7 @@ import (
 	"github.com/rmandevs/agents-casc/internal/state"
 )
 
-// Action es lo que el plan hará con un recurso.
+// Action is what the plan will do with a resource.
 type Action string
 
 const (
@@ -22,28 +22,29 @@ const (
 	Update   Action = "update"
 	Delete   Action = "delete"
 	Conflict Action = "conflict"
-	// Adopt: la entrada ya está como se quiere; solo se registra en el estado.
+	// Adopt: the entry is already as desired; it is only recorded in state.
 	Adopt Action = "adopt"
-	// Forget: ya no estaba en el archivo; solo se quita del estado.
+	// Forget: it was already absent from the file; it is only removed from
+	// state.
 	Forget Action = "forget"
 )
 
-// Want es el estado deseado de un MCP en un target. nil = debe no estar.
+// Want is the desired state of an MCP in a target. nil = it must not exist.
 type Want struct {
 	MCP    mcp.MCP
 	Origin state.Origin
 }
 
-// Target es lo que el plan sabe de un target: su provider, su alcance, y
-// qué se quiere de cada nombre que la operación toca.
+// Target is what the plan knows about a target: its provider, its scope, and
+// what is wanted for each name the operation touches.
 type Target struct {
 	Target   agent.Target
 	Provider agent.MCPProvider
 	Wants    map[string]*Want
 }
 
-// Scope es un alcance a planear: sus targets, su estado y cómo resolver
-// secretos.
+// Scope is a scope to plan: its targets, its state, and how to resolve
+// secrets.
 type Scope struct {
 	Scope    agent.Scope
 	State    *state.State
@@ -53,11 +54,11 @@ type Scope struct {
 	Context  []ContextFile
 }
 
-// Change es una línea del plan.
+// Change is one line of the plan.
 type Change struct {
 	Scope  agent.Scope
 	Target string
-	// Kind: mcp, skill o context.
+	// Kind: mcp, skill, or context.
 	Kind     string
 	Name     string
 	Action   Action
@@ -65,30 +66,31 @@ type Change struct {
 	File     string
 	Reason   string
 	Warnings []string
-	// Forced: un conflicto que --force convierte en esta acción.
+	// Forced: a conflict that --force turns into this action.
 	Forced Action
 
-	// Detail completa la línea cuando no hay Reason (p. ej. a dónde apunta
-	// una skill). Link es la carpeta local a la que apunta, si es local.
+	// Detail completes the line when there is no Reason (for example,
+	// where a skill points). Link is the local directory it points to, if
+	// local.
 	Detail string
 	Link   string
 
 	entry  state.Entry
-	do     Action // lo que hará Apply; "" en un conflicto sin resolver
-	silent bool   // solo cambia el estado (p. ej. el origen); no se muestra
-	// run escribe en disco (skills, contexto); commit actualiza el estado.
+	do     Action // what Apply will do; "" in an unresolved conflict
+	silent bool   // only changes state (for example, origin); not shown
+	// run writes to disk (skills, context); commit updates state.
 	run    func() error
 	commit func(*state.State)
 }
 
-// Blocked informa si es un conflicto que Apply no va a resolver.
+// Blocked reports whether this is a conflict Apply will not resolve.
 func (c Change) Blocked() bool { return c.Action == Conflict && c.do == "" }
 
-// Visible informa si el cambio se muestra en el plan.
+// Visible reports whether the change is shown in the plan.
 func (c Change) Visible() bool { return !c.silent }
 
-// Plan es el resultado de Compute: los cambios y los archivos ya editados en
-// memoria, listos para Apply.
+// Plan is the result of Compute: the changes and the files already edited in
+// memory, ready for Apply.
 type Plan struct {
 	Changes []Change
 	docs    map[string]*openDoc
@@ -100,13 +102,13 @@ type openDoc struct {
 	doc  native.Doc
 }
 
-// Options de Compute.
+// Options for Compute.
 type Options struct {
-	// Force convierte los conflictos en su acción subyacente.
+	// Force turns conflicts into their underlying action.
 	Force bool
 }
 
-// Compute arma el plan. No escribe nada.
+// Compute builds the plan. It writes nothing.
 func Compute(scopes []Scope, opts Options) (*Plan, error) {
 	p := &Plan{docs: map[string]*openDoc{}, scopes: scopes}
 	for _, sc := range scopes {
@@ -172,20 +174,20 @@ func (p *Plan) target(sc Scope, t Target, opts Options) error {
 				return fmt.Errorf("%s · %s: mcp %s: %w", tid, sc.Scope, name, err)
 			}
 			for _, m := range enc.Masked {
-				c.Warnings = append(c.Warnings, "secreto en texto plano en "+m)
+				c.Warnings = append(c.Warnings, "secret in plain text at "+m)
 			}
 			c.entry = state.Entry{File: f.Path, Hash: native.Hash(obj, enc.Masked), Masked: enc.Masked, Origin: want.Origin}
 			same := present && (native.Equal(obs, obj) || decodesTo(t.Provider, obs, want.MCP))
 			edited := managed && present && native.Hash(obs, st.Masked) != st.Hash
 			switch {
 			case managed && !present:
-				c.Action, c.Reason = Create, "borrado a mano; se vuelve a crear"
+				c.Action, c.Reason = Create, "deleted manually; recreating"
 			case same && (edited || !managed):
 				c.Action = Adopt
 				c.entry.Hash = native.Hash(obs, enc.Masked)
-				c.Reason = "ya estaba así; pegboard lo registra"
+				c.Reason = "already in place; pegboard records it"
 				if edited {
-					c.Reason = "editado a mano, pero ya coincide"
+					c.Reason = "edited manually, but it already matches"
 				}
 			case same:
 				if st.Origin == want.Origin && st.Hash == native.Hash(obs, enc.Masked) {
@@ -194,9 +196,9 @@ func (p *Plan) target(sc Scope, t Target, opts Options) error {
 				c.Action, c.silent = Adopt, true
 				c.entry.Hash = native.Hash(obs, enc.Masked)
 			case edited:
-				c.Action, c.Forced, c.Reason = Conflict, Update, "editado a mano desde el último apply"
+				c.Action, c.Forced, c.Reason = Conflict, Update, "edited manually since the last apply"
 			case !managed && present:
-				c.Action, c.Forced, c.Reason = Conflict, Update, "ya existe y no lo creó pegboard"
+				c.Action, c.Forced, c.Reason = Conflict, Update, "already exists and was not created by pegboard"
 			case managed:
 				c.Action = Update
 			default:
@@ -209,9 +211,9 @@ func (p *Plan) target(sc Scope, t Target, opts Options) error {
 			c.Origin = st.Origin
 			switch {
 			case !present:
-				c.Action, c.Reason = Forget, "ya no estaba en el archivo"
+				c.Action, c.Reason = Forget, "no longer in the file"
 			case native.Hash(obs, st.Masked) != st.Hash:
-				c.Action, c.Forced, c.Reason = Conflict, Delete, "editado a mano; no se quita"
+				c.Action, c.Forced, c.Reason = Conflict, Delete, "edited manually; not removing"
 			default:
 				c.Action = Delete
 			}
@@ -241,14 +243,14 @@ func (p *Plan) target(sc Scope, t Target, opts Options) error {
 	return nil
 }
 
-// decodesTo informa si la entrada observada significa lo mismo que el MCP
-// deseado, aunque esté escrita distinto (p. ej. "type": "stdio" de más).
+// decodesTo reports whether the observed entry means the same as the desired
+// MCP, even if written differently (for example, an extra "type": "stdio").
 func decodesTo(p agent.MCPProvider, obs any, want mcp.MCP) bool {
 	got, err := p.DecodeMCP(obs)
 	return err == nil && got.Equal(want)
 }
 
-// Summary cuenta los cambios visibles por acción.
+// Summary counts visible changes by action.
 func (p *Plan) Summary() map[Action]int {
 	out := map[Action]int{}
 	for _, c := range p.Changes {
@@ -259,7 +261,7 @@ func (p *Plan) Summary() map[Action]int {
 	return out
 }
 
-// Blocked informa si hay conflictos sin resolver: detienen el apply.
+// Blocked reports whether there are unresolved conflicts: they stop apply.
 func (p *Plan) Blocked() bool {
 	for _, c := range p.Changes {
 		if c.Blocked() {
@@ -269,7 +271,7 @@ func (p *Plan) Blocked() bool {
 	return false
 }
 
-// Empty informa si no hay nada que mostrar.
+// Empty reports whether there is nothing to show.
 func (p *Plan) Empty() bool {
 	for _, c := range p.Changes {
 		if c.Visible() {
@@ -279,5 +281,6 @@ func (p *Plan) Empty() bool {
 	return true
 }
 
-// Pending informa si Apply tiene algo que hacer (incluido solo el estado).
+// Pending reports whether Apply has anything to do (including state-only
+// changes).
 func (p *Plan) Pending() bool { return len(p.Changes) > 0 }

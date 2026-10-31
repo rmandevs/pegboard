@@ -10,7 +10,7 @@ import (
 func TestDetectNothing(t *testing.T) {
 	m := agenttest.New(t)
 	if got := (Provider{}).Detect(m.Env(), agent.Global); len(got) != 0 {
-		t.Errorf("no debía detectar nada: %+v", got)
+		t.Errorf("it should not detect anything: %+v", got)
 	}
 }
 
@@ -22,7 +22,7 @@ func TestDetectGlobal(t *testing.T) {
 		t.Fatalf("%+v", got)
 	}
 	if got[0].Paths.MCPs != m.Path("home/.codex/config.toml") || got[0].Paths.Skills != m.Path("home/.agents/skills") {
-		t.Errorf("rutas: %+v", got[0].Paths)
+		t.Errorf("paths: %+v", got[0].Paths)
 	}
 }
 
@@ -41,12 +41,12 @@ func TestDetectProject(t *testing.T) {
 	m.File("proj/AGENTS.md", "# x")
 	got := (Provider{}).Detect(m.Env(), agent.Project)
 	if len(got) != 1 {
-		t.Fatal("no detectó proyecto")
+		t.Fatal("it did not detect the project")
 	}
 	if got[0].Paths.MCPs != m.Path("proj/.codex/config.toml") || got[0].Paths.Skills != m.Path("proj/.agents/skills") {
-		t.Errorf("rutas: %+v", got[0].Paths)
+		t.Errorf("paths: %+v", got[0].Paths)
 	}
 	if len(got[0].Evidence) != 1 || got[0].Evidence[0] != "AGENTS.md" {
-		t.Errorf("evidencia: %v", got[0].Evidence)
+		t.Errorf("evidence: %v", got[0].Evidence)
 	}
 }

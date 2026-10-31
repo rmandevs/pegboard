@@ -1,5 +1,5 @@
-// Package skill trae la skill propia de pegboard (SPEC §7), embebida en el
-// binario para `pegboard skill install` y la fuente `pegboard`.
+// Package skill embeds pegboard's own skill (SPEC §7) in the binary for
+// `pegboard skill install` and the `pegboard` source.
 package skill
 
 import (
@@ -10,5 +10,5 @@ import (
 //go:embed SKILL.md
 var files embed.FS
 
-// FS es el contenido de la skill.
+// FS is the skill content.
 func FS() fs.FS { return files }

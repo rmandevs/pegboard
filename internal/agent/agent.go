@@ -1,5 +1,5 @@
-// Package agent define los tipos comunes a todos los providers: alcances,
-// targets, el entorno donde se detectan y la interfaz Provider.
+// Package agent defines the types shared by all providers: scopes, targets,
+// the environment where they are detected, and the Provider interface.
 package agent
 
 import (
@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Scope es el alcance de un stack: el usuario (global) o una carpeta (project).
+// Scope is the scope of a stack: the user (global) or a directory (project).
 type Scope string
 
 const (
@@ -17,7 +17,7 @@ const (
 	Project Scope = "project"
 )
 
-// ParseScope convierte el valor de --scope. Vacío significa "todos".
+// ParseScope converts the --scope value. Empty means "all".
 func ParseScope(s string) ([]Scope, bool) {
 	switch s {
 	case "":
@@ -30,15 +30,15 @@ func ParseScope(s string) ([]Scope, bool) {
 	return nil, false
 }
 
-// Paths son las rutas nativas donde un target guarda cada tipo de recurso.
-// Una ruta vacía significa que el agente no soporta ese recurso en el alcance.
+// Paths are the native paths where a target stores each kind of resource.
+// An empty path means the agent does not support that resource in the scope.
 type Paths struct {
 	MCPs    string `json:"mcps,omitempty"`
 	Skills  string `json:"skills,omitempty"`
 	Context string `json:"context,omitempty"`
 }
 
-// Target es un agente en un alcance concreto (p. ej. Claude Code × proyecto).
+// Target is an agent in a specific scope (for example, Claude Code × project).
 type Target struct {
 	Agent    string `json:"agent"`
 	Profile  string `json:"profile,omitempty"`
@@ -46,12 +46,12 @@ type Target struct {
 	Provider int    `json:"provider_version"`
 	Binary   string `json:"binary,omitempty"`
 	Version  string `json:"version,omitempty"`
-	// Evidence lista qué se encontró para dar el target por detectado.
+	// Evidence lists what was found to consider the target detected.
 	Evidence []string `json:"evidence"`
 	Paths    Paths    `json:"paths"`
 }
 
-// ID identifica el target dentro de su alcance: "claude-code", "hermes:work".
+// ID identifies the target within its scope: "claude-code", "hermes:work".
 func (t Target) ID() string {
 	if t.Profile != "" {
 		return t.Agent + ":" + t.Profile
@@ -59,32 +59,33 @@ func (t Target) ID() string {
 	return t.Agent
 }
 
-// Provider es el adaptador de un agente. En la fase 0 solo detecta; Read,
-// Plan y Apply llegan con la fase 1 (SPEC §5).
+// Provider is an agent adapter. It knows how to detect its targets; the
+// engine handles reading, planning, and applying changes.
 type Provider interface {
 	ID() string
-	// Version es la versión del provider, no la del agente: sube cuando
-	// cambian las rutas o el formato que entiende.
+	// Version is the provider version, not the agent version: it increases
+	// when the paths or formats it understands change.
 	Version() int
-	// Detect devuelve los targets del agente en el alcance; ninguno si no
-	// está instalado o no aplica. Puede haber varios (perfiles de Hermes).
+	// Detect returns the agent's targets in the scope; none if the agent is
+	// not installed or does not apply. There may be several (Hermes
+	// profiles).
 	Detect(env Env, scope Scope) []Target
 }
 
-// Env es todo lo que un provider consulta de la máquina. Los tests lo
-// construyen sobre un t.TempDir().
+// Env is everything a provider queries from the machine. Tests build it on
+// top of a t.TempDir().
 type Env struct {
 	Home       string
 	ProjectDir string
 	Getenv     func(string) string
 	LookPath   func(string) (string, error)
-	// BinVersion devuelve la versión de un binario, o "" si no se sabe.
+	// BinVersion returns the version of a binary, or "" if unknown.
 	BinVersion func(path string) string
 	LookupEnv  func(string) (string, bool)
 	Now        func() time.Time
 }
 
-// DefaultEnv es el entorno real del proceso.
+// DefaultEnv is the process's real environment.
 func DefaultEnv(projectDir string) (Env, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -105,7 +106,8 @@ func DefaultEnv(projectDir string) (Env, error) {
 	}, nil
 }
 
-// NewTarget arma un target detectado; consulta la versión si hay binario.
+// NewTarget builds a detected target and queries the version if a binary is
+// available.
 func (e Env) NewTarget(p Provider, scope Scope, bin string, evidence []string, paths Paths) Target {
 	t := Target{
 		Agent:    p.ID(),
@@ -124,7 +126,7 @@ func (e Env) NewTarget(p Provider, scope Scope, bin string, evidence []string, p
 	return t
 }
 
-// EnvDir devuelve $name si está definida, o home/def.
+// EnvDir returns $name if set, or home/def.
 func (e Env) EnvDir(name, def string) string {
 	if v := e.Getenv(name); v != "" {
 		return v
@@ -132,19 +134,19 @@ func (e Env) EnvDir(name, def string) string {
 	return filepath.Join(e.Home, def)
 }
 
-// XDGConfig es $XDG_CONFIG_HOME o ~/.config.
+// XDGConfig is $XDG_CONFIG_HOME or ~/.config.
 func (e Env) XDGConfig() string {
 	return e.EnvDir("XDG_CONFIG_HOME", ".config")
 }
 
-// Pretty abrevia una ruta para mostrarla: relativa al proyecto o con ~.
-// Las abreviadas usan / en todos los sistemas, para que la salida sea la
-// misma en Windows.
+// Pretty shortens a path for display: relative to the project or with ~.
+// Shortened paths use / on every platform so the output is the same on
+// Windows.
 func (e Env) Pretty(p string) string {
 	if p == "" {
 		return ""
 	}
-	// Desde el home, ~/… es más claro que una ruta relativa.
+	// From home, ~/… is clearer than a relative path.
 	if e.ProjectDir != "" && filepath.Clean(e.ProjectDir) != filepath.Clean(e.Home) {
 		if rel, ok := under(e.ProjectDir, p); ok {
 			return filepath.ToSlash(rel)
@@ -164,15 +166,15 @@ func under(base, p string) (string, bool) {
 	return rel, true
 }
 
-// Exists informa si la ruta existe (archivo o carpeta).
+// Exists reports whether the path exists (file or directory).
 func Exists(p string) bool {
 	_, err := os.Stat(p)
 	return err == nil
 }
 
-// Installed reúne la evidencia de instalación global de un agente: su
-// binario en el PATH y las rutas propias que existan. Devuelve la ruta del
-// binario ("" si no está) y la evidencia, vacía si no hay nada.
+// Installed gathers the evidence of a global agent installation: its binary
+// on PATH and its own paths that exist. It returns the binary path ("" if
+// absent) and the evidence, empty if nothing was found.
 func (e Env) Installed(bin string, paths ...string) (string, []string) {
 	var evidence []string
 	binPath, err := e.LookPath(bin)
@@ -189,7 +191,7 @@ func (e Env) Installed(bin string, paths ...string) (string, []string) {
 	return binPath, evidence
 }
 
-// Present filtra las rutas que existen, abreviadas para mostrarlas.
+// Present filters the paths that exist, shortened for display.
 func (e Env) Present(paths ...string) []string {
 	var out []string
 	for _, p := range paths {
@@ -200,19 +202,20 @@ func (e Env) Present(paths ...string) []string {
 	return out
 }
 
-// StateDir es $XDG_STATE_HOME/pegboard (~/.local/state/pegboard): estado
-// global y backups.
+// StateDir is $XDG_STATE_HOME/pegboard (~/.local/state/pegboard): global
+// state and backups.
 func (e Env) StateDir() string {
 	return filepath.Join(e.EnvDir("XDG_STATE_HOME", filepath.Join(".local", "state")), "pegboard")
 }
 
-// ConfigDir es $XDG_CONFIG_HOME/pegboard: donde vive el pegboard.yaml global.
+// ConfigDir is $XDG_CONFIG_HOME/pegboard: where the global pegboard.yaml
+// lives.
 func (e Env) ConfigDir() string {
 	return filepath.Join(e.XDGConfig(), "pegboard")
 }
 
-// CacheDir es $XDG_CACHE_HOME/pegboard (~/.cache/pegboard): las skills
-// descargadas, una sola vez por contenido.
+// CacheDir is $XDG_CACHE_HOME/pegboard (~/.cache/pegboard): downloaded
+// skills, stored once per content hash.
 func (e Env) CacheDir() string {
 	return filepath.Join(e.EnvDir("XDG_CACHE_HOME", ".cache"), "pegboard")
 }

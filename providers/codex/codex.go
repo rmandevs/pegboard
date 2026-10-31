@@ -1,4 +1,4 @@
-// Package codex es el provider de OpenAI Codex CLI.
+// Package codex is the OpenAI Codex CLI provider.
 package codex
 
 import (
@@ -12,9 +12,9 @@ type Provider struct{}
 func (Provider) ID() string   { return "codex" }
 func (Provider) Version() int { return 1 }
 
-// Detect: instalado si `codex` está en el PATH o existe $CODEX_HOME
-// (~/.codex). Las skills viven en .agents/skills, compartido con otros
-// agentes que siguen esa convención.
+// Detect: installed if `codex` is on PATH or $CODEX_HOME (~/.codex) exists.
+// Skills live in .agents/skills, shared with other agents that follow that
+// convention.
 func (p Provider) Detect(env agent.Env, scope agent.Scope) []agent.Target {
 	home := env.EnvDir("CODEX_HOME", ".codex")
 	bin, evidence := env.Installed("codex", home)

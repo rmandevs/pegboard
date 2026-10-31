@@ -9,8 +9,9 @@ import (
 	"time"
 )
 
-// WriteAtomic escribe en un temporal de la misma carpeta y lo renombra: el
-// archivo nunca queda a medias. Conserva los permisos si ya existía.
+// WriteAtomic writes to a temporary file in the same directory and renames
+// it: the file is never left half-written. It preserves permissions if the
+// file already existed.
 func WriteAtomic(path string, data []byte, perm fs.FileMode) error {
 	if info, err := os.Stat(path); err == nil {
 		perm = info.Mode().Perm()
@@ -23,7 +24,7 @@ func WriteAtomic(path string, data []byte, perm fs.FileMode) error {
 	if err != nil {
 		return err
 	}
-	defer func() { _ = os.Remove(tmp.Name()) }() // tras el rename ya no existe
+	defer func() { _ = os.Remove(tmp.Name()) }() // after the rename it no longer exists
 	if _, err := tmp.Write(data); err != nil {
 		_ = tmp.Close()
 		return err
@@ -38,8 +39,8 @@ func WriteAtomic(path string, data []byte, perm fs.FileMode) error {
 	return os.Rename(tmp.Name(), path)
 }
 
-// Backup copia path a dir/<fecha>/<ruta aplanada> antes de modificarlo y
-// devuelve dónde quedó ("" si el archivo no existía).
+// Backup copies path to dir/<date>/<flattened path> before modifying it and
+// returns where it went ("" if the file did not exist).
 func Backup(dir string, now time.Time, path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -53,6 +54,6 @@ func Backup(dir string, now time.Time, path string) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o700); err != nil {
 		return "", err
 	}
-	// Los backups pueden tener secretos (los del usuario): solo para él.
+	// Backups may contain secrets (the user's): owner-only.
 	return dst, os.WriteFile(dst, data, 0o600)
 }

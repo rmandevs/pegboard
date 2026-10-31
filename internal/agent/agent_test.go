@@ -11,7 +11,7 @@ func TestParseVersion(t *testing.T) {
 		"codex-cli 0.46.0":          "0.46.0",
 		"opencode v1.0.12-beta.1\n": "1.0.12-beta.1",
 		"Hermes Agent 0.9":          "0.9",
-		"sin versión":               "",
+		"no version":                "",
 	}
 	for in, want := range cases {
 		if got := ParseVersion(in); got != want {
@@ -22,13 +22,13 @@ func TestParseVersion(t *testing.T) {
 
 func TestParseScope(t *testing.T) {
 	if s, ok := ParseScope(""); !ok || len(s) != 2 {
-		t.Errorf("vacío debía dar ambos alcances: %v", s)
+		t.Errorf("empty should return both scopes: %v", s)
 	}
 	if s, ok := ParseScope("project"); !ok || len(s) != 1 || s[0] != Project {
 		t.Errorf("project: %v", s)
 	}
-	if _, ok := ParseScope("todo"); ok {
-		t.Error("todo debía ser inválido")
+	if _, ok := ParseScope("all"); ok {
+		t.Error("all should be invalid")
 	}
 }
 

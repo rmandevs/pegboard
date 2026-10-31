@@ -26,8 +26,8 @@ var cases = map[string]mcp.MCP{
 
 var values = map[string]string{"GITHUB_TOKEN": "ghp", "LINEAR": "lin", "ORG": "org"}
 
-// resolved es el MCP con los secretos resueltos: lo que se lee de vuelta en
-// un agente que no admite referencias.
+// resolved is the MCP with secrets resolved: what is read back from an agent
+// that does not support references.
 func resolved(m mcp.MCP) mcp.MCP {
 	r := secrets.Resolver{LookupEnv: func(k string) (string, bool) { v, ok := values[k]; return v, ok }}
 	exp := func(s string) string { v, _, _ := r.Expand(s, nil); return v }
@@ -50,14 +50,14 @@ func resolved(m mcp.MCP) mcp.MCP {
 	return out
 }
 
-// Ida y vuelta: codificar → escribir → leer → decodificar da el mismo MCP,
-// y lo leído coincide con el hash que guardaría el estado.
+// Round trip: encode → write → read → decode returns the same MCP, and what
+// is read matches the hash the state would store.
 func TestRoundTrip(t *testing.T) {
-	// Qué agentes conservan las referencias (y cuáles quedan en claro).
+	// Which agents keep references (and which end up in plain text).
 	keepsRefs := map[string]map[string]bool{
 		"claude-code": {"stdio": true, "http": true},
 		"opencode":    {"stdio": true, "http": true},
-		// Codex reenvía GITHUB_TOKEN (misma llave) y los headers de env.
+		// Codex forwards GITHUB_TOKEN (same key) and env headers.
 		"codex":  {"stdio": true, "http": true},
 		"hermes": {},
 	}
@@ -97,7 +97,7 @@ func TestRoundTrip(t *testing.T) {
 					t.Fatal(err)
 				}
 				if native.Hash(ents[name], enc.Masked) != native.Hash(obj, enc.Masked) {
-					t.Fatalf("el hash de lo leído no coincide con lo escrito:\n%s\n%s", native.Canonical(ents[name]), native.Canonical(obj))
+					t.Fatalf("the hash of what was read does not match what was written:\n%s\n%s", native.Canonical(ents[name]), native.Canonical(obj))
 				}
 				got, err := mp.DecodeMCP(ents[name])
 				if err != nil {
@@ -108,10 +108,10 @@ func TestRoundTrip(t *testing.T) {
 					want = resolved(m)
 				}
 				if !got.Equal(want) {
-					t.Fatalf("ida y vuelta:\n got %+v\nwant %+v\n%s", got, want, b)
+					t.Fatalf("round trip:\n got %+v\nwant %+v\n%s", got, want, b)
 				}
 				if keepsRefs[p.ID()][name] && len(enc.Masked) > 0 && p.ID() != "codex" {
-					t.Errorf("no debía quedar nada en claro: %v", enc.Masked)
+					t.Errorf("nothing should be left in plain text: %v", enc.Masked)
 				}
 			})
 		}

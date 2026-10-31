@@ -10,7 +10,7 @@ import (
 	"github.com/rmandevs/agents-casc/internal/state"
 )
 
-// DriftKind es el resultado de comparar una entrada del estado con su archivo.
+// DriftKind is the result of comparing a state entry with its file.
 type DriftKind string
 
 const (
@@ -19,10 +19,10 @@ const (
 	Missing DriftKind = "missing"
 )
 
-// DriftItem es un MCP registrado en el estado y cómo está en su archivo.
+// DriftItem is an MCP registered in state and how it looks in its file.
 type DriftItem struct {
 	Scope agent.Scope `json:"scope"`
-	// Resource: mcp o skill.
+	// Resource: mcp or skill.
 	Resource string       `json:"kind"`
 	Target   string       `json:"target"`
 	Name     string       `json:"name"`
@@ -31,10 +31,10 @@ type DriftItem struct {
 	Kind     DriftKind    `json:"status"`
 }
 
-// Lookup encuentra el provider de un agente por ID.
+// Lookup finds an agent's provider by ID.
 type Lookup func(agentID string) (agent.MCPProvider, bool)
 
-// Drift compara cada entrada del estado con el archivo real.
+// Drift compares each state entry with the real file.
 func Drift(sc agent.Scope, st *state.State, lookup Lookup) ([]DriftItem, error) {
 	var out []DriftItem
 	docs := map[string]map[string]any{}
@@ -42,7 +42,7 @@ func Drift(sc agent.Scope, st *state.State, lookup Lookup) ([]DriftItem, error) 
 		agentID, profile, _ := strings.Cut(tid, ":")
 		p, ok := lookup(agentID)
 		if !ok {
-			return nil, fmt.Errorf("el estado menciona un agente desconocido: %s", tid)
+			return nil, fmt.Errorf("state references an unknown agent: %s", tid)
 		}
 		for _, name := range st.Names(tid) {
 			e, _ := st.Get(tid, name)

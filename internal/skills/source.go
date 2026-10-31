@@ -1,18 +1,19 @@
-// Package skills resuelve skills (SPEC §5, "Skills: cómo se instalan"): de
-// dónde vienen, su contenido exacto (hash) y su copia única en el caché.
+// Package skills resolves skills (SPEC §5, "Skills: how they are installed"):
+// where they come from, their exact content (hash), and their single copy in
+// the cache.
 //
-// Las fuentes usan las mismas convenciones que `npx skills` y skills.sh, para
-// que un repo de skills sirva igual a los dos:
+// Sources use the same conventions as `npx skills` and skills.sh, so one
+// skills repository works with both:
 //
-//	owner/repo                     todas las skills de un repo de GitHub
-//	owner/repo@skill               una sola skill del repo
-//	github.com/owner/repo//ruta    host + subcarpeta (estilo go-getter)
-//	https://github.com/o/r/tree/<ref>/<ruta>
-//	https://… o git@…              cualquier repo git (admite //ruta)
-//	./ruta, ../ruta, /ruta, ~/ruta skill local (se enlaza tal cual)
-//	pegboard                       la skill propia de pegboard
+//	owner/repo                     all skills in a GitHub repo
+//	owner/repo@skill               one skill from the repo
+//	github.com/owner/repo//path    host + subdirectory (go-getter style)
+//	https://github.com/o/r/tree/<ref>/<path>
+//	https://… or git@…             any git repo (supports //path)
+//	./path, ../path, /path, ~/path local skill (linked as-is)
+//	pegboard                       pegboard's own skill
 //
-// Las fuentes git aceptan ?ref=<rama|tag|commit> al final.
+// Git sources accept ?ref=<branch|tag|commit> at the end.
 package skills
 
 import (
@@ -22,7 +23,7 @@ import (
 	"strings"
 )
 
-// Kind es el tipo de fuente.
+// Kind is the source type.
 type Kind string
 
 const (
@@ -31,15 +32,15 @@ const (
 	Builtin Kind = "builtin"
 )
 
-// Source es una fuente de skills ya interpretada.
+// Source is an already parsed skill source.
 type Source struct {
 	Raw   string
 	Kind  Kind
-	URL   string // repo git
-	Path  string // subcarpeta dentro del repo
-	Ref   string // rama, tag o commit; "" = la rama por defecto
-	Skill string // solo esta skill (owner/repo@skill)
-	Dir   string // fuente local, sin resolver contra la carpeta del stack
+	URL   string // git repo
+	Path  string // subdirectory inside the repo
+	Ref   string // branch, tag, or commit; "" = default branch
+	Skill string // only this skill (owner/repo@skill)
+	Dir   string // local source, unresolved against the stack directory
 }
 
 var (
@@ -49,15 +50,15 @@ var (
 	nameRe  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`)
 )
 
-// GitHub es la base de los atajos owner/repo; los tests la cambian.
+// GitHub is the base for the owner/repo shortcuts; tests replace it.
 var GitHub = "https://github.com/"
 
-// Parse interpreta una fuente.
+// Parse interprets a source.
 func Parse(raw string) (Source, error) {
 	s := Source{Raw: raw}
 	rest := strings.TrimSpace(raw)
 	if rest == "" {
-		return s, fmt.Errorf("fuente vacía")
+		return s, fmt.Errorf("empty source")
 	}
 	if rest == "pegboard" {
 		s.Kind = Builtin
@@ -72,18 +73,18 @@ func Parse(raw string) (Source, error) {
 	if i := strings.LastIndex(rest, "?ref="); i >= 0 {
 		s.Ref, rest = rest[i+len("?ref="):], rest[:i]
 		if s.Ref == "" {
-			return s, fmt.Errorf("%s: ?ref= vacío", raw)
+			return s, fmt.Errorf("%s: empty ?ref=", raw)
 		}
 	}
 	if m := treeRe.FindStringSubmatch(rest); m != nil {
 		if s.Ref != "" {
-			return s, fmt.Errorf("%s: el ref ya va en la URL /tree/", raw)
+			return s, fmt.Errorf("%s: the ref is already in the /tree/ URL", raw)
 		}
 		s.URL = "https://" + m[1] + "/" + m[2] + "/" + strings.TrimSuffix(m[3], ".git") + ".git"
 		s.Ref, s.Path = m[4], m[5]
 		return s, nil
 	}
-	// //subcarpeta (después del esquema, si lo hay).
+	// //subdirectory (after the scheme, if any).
 	scheme := ""
 	if i := strings.Index(rest, "://"); i >= 0 {
 		scheme, rest = rest[:i+3], rest[i+3:]
@@ -98,7 +99,7 @@ func Parse(raw string) (Source, error) {
 		repo, skill, has := strings.Cut(rest, "@")
 		if has {
 			if !nameRe.MatchString(skill) {
-				return s, fmt.Errorf("%s: nombre de skill inválido %q", raw, skill)
+				return s, fmt.Errorf("%s: invalid skill name %q", raw, skill)
 			}
 			s.Skill = skill
 		}
@@ -107,12 +108,12 @@ func Parse(raw string) (Source, error) {
 		m := hostRe.FindStringSubmatch(rest)
 		s.URL = "https://" + m[1] + "/" + m[2] + "/" + m[3] + ".git"
 	default:
-		return s, fmt.Errorf("fuente de skill no reconocida %q (ver `pegboard install --help`)", raw)
+		return s, fmt.Errorf("unrecognized skill source %q (see `pegboard install --help`)", raw)
 	}
 	return s, nil
 }
 
-// FileURL es la URL file:// de una carpeta local (file:///C:/… en Windows).
+// FileURL is the file:// URL of a local directory (file:///C:/… on Windows).
 func FileURL(dir string) string {
 	p := filepath.ToSlash(dir)
 	if !strings.HasPrefix(p, "/") {

@@ -1,4 +1,4 @@
-// Package hermes es el provider de Hermes Agent (Nous Research).
+// Package hermes is the Hermes Agent (Nous Research) provider.
 package hermes
 
 import (
@@ -14,10 +14,10 @@ type Provider struct{}
 func (Provider) ID() string   { return "hermes" }
 func (Provider) Version() int { return 1 }
 
-// Detect: instalado si `hermes` está en el PATH o existe $HERMES_HOME
-// (~/.hermes). Cada carpeta en profiles/ es un sub-target hermes:<perfil>
-// con la misma estructura. En un proyecto Hermes solo lee skills
-// (.hermes/skills); sus MCPs son siempre globales.
+// Detect: installed if `hermes` is on PATH or $HERMES_HOME (~/.hermes)
+// exists. Each directory under profiles/ is a hermes:<profile> sub-target
+// with the same structure. In a project, Hermes only reads skills
+// (.hermes/skills); its MCPs are always global.
 func (p Provider) Detect(env agent.Env, scope agent.Scope) []agent.Target {
 	home := env.EnvDir("HERMES_HOME", ".hermes")
 	bin, evidence := env.Installed("hermes", home)
