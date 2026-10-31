@@ -1,6 +1,6 @@
 # Pegboard — SPEC
 
-Version: 0.1 · Status: MVP (phases 0–2): MCPs, skills, and AGENTS.md in Claude Code, Codex, opencode, and Hermes
+Version: 0.1 · Status: MVP (phases 0–2): MCPs, skills, and AGENTS.md in Claude Code, Codex, opencode, Hermes, Pi, OMP, OpenClaw, Cursor, and Gemini CLI
 Origin: §4.1–4.2 of `tapioca-core/SPEC.md` (`stack.yaml` + `apply`), split out
 as its own product. Product and binary: **Pegboard** / `pegboard`
 (`peg` already exists in Homebrew; anyone who wants can use `alias pb=pegboard`).
@@ -11,7 +11,8 @@ as its own product. Product and binary: **Pegboard** / `pegboard`
 
 **Configuration as Code for agents.** You declare in YAML which MCPs, skills,
 and context you want and in which agents (Claude Code, Codex, opencode,
-Hermes…), and `pegboard` leaves each agent configured with its native files.
+Hermes, Pi, OMP, OpenClaw, Cursor, Gemini CLI…), and `pegboard` leaves each
+agent configured with its native files.
 Think Ansible (redistributable roles, idempotency) with Terraform's discipline
 (`plan`, `apply`, state, drift, lock).
 
@@ -158,6 +159,11 @@ in the `plan` that the secret will remain in plain text in that file.
 | Codex | `env_vars = ["X"]` if the key is `X`; `Authorization: Bearer ${env:X}` → `bearer_token_env_var`; header `${env:X}` → `env_http_headers`; everything else plain text | plain text |
 | opencode | `{env:X}` | `{file:/absolute/path}` |
 | Hermes | plain text | plain text |
+| Pi | `${X}` | plain text |
+| OMP | `${X}` | plain text |
+| OpenClaw | `${X}` | plain text |
+| Cursor | `${env:X}` | plain text |
+| Gemini CLI | `${X}` | plain text |
 
 State stores a hash of each entry with plain-text values masked: it detects
 manual edits without depending on the secret. Because `plan` compares what is
@@ -325,6 +331,11 @@ point, not truth.
 | Codex | `codex` · `~/.codex` (`CODEX_HOME`) | `~/.codex/config.toml` (`[mcp_servers.*]`) / `.codex/config.toml` | `~/.agents/skills/` / `.agents/skills/` | native `AGENTS.md` |
 | opencode | `opencode` · `~/.config/opencode` (`XDG_CONFIG_HOME`) | `~/.config/opencode/opencode.json` / `opencode.json` (`mcp`) | `~/.config/opencode/skills/` / `.agents/skills/` | native `AGENTS.md` |
 | Hermes | `hermes` · `~/.hermes` (`HERMES_HOME`) | `~/.hermes/config.yaml` (`mcp_servers`) | `~/.hermes/skills/` / `.hermes/skills/`; profiles in `~/.hermes/profiles/<p>/` | `SOUL.md` |
+| Pi | `pi` · `~/.pi/agent` (`PI_CODING_AGENT_DIR`) | `~/.pi/agent/mcp.json` / `.pi/mcp.json` (`mcpServers`) | `~/.pi/agent/skills/` / `.pi/skills/` | `AGENTS.md` |
+| OMP | `omp` · `~/.omp/agent` (`PI_CONFIG_DIR`, `PI_CODING_AGENT_DIR`) | `~/.omp/agent/mcp.json` / `.omp/mcp.json` (`mcpServers`); profiles in `~/.omp/profiles/<p>/agent/` | `~/.omp/agent/skills/` / `.omp/skills/`; profiles in `~/.omp/profiles/<p>/agent/skills/` | `~/.omp/agent/AGENTS.md` / `.omp/AGENTS.md` |
+| OpenClaw | `openclaw` · `~/.openclaw` (`OPENCLAW_STATE_DIR`, `OPENCLAW_CONFIG_PATH`) | `~/.openclaw/openclaw.json` (`mcp.servers`, JSON5); no project scope | `<state-dir>/skills/` | workspace `AGENTS.md` |
+| Cursor | `cursor` or `cursor-agent` · `~/.cursor` | `~/.cursor/mcp.json` / `.cursor/mcp.json` (`mcpServers`) | `~/.cursor/skills/` / `.cursor/skills/` | project `AGENTS.md` |
+| Gemini CLI | `gemini` · `~/.gemini` (`GEMINI_CLI_HOME`) | `~/.gemini/settings.json` / `.gemini/settings.json` (`mcpServers`) | `~/.gemini/skills/` / `.gemini/skills/` | `GEMINI.md` |
 
 Skills directories follow the `npx skills` agent table (`docs/agents.md` from
 vercel-labs/skills 1.7.3). In a project, Codex and opencode share
@@ -334,15 +345,17 @@ and the plan shows it as `codex, opencode · project`.
 To verify against each real agent: `opencode.jsonc` (today only
 `opencode.json` is written); that `CLAUDE_CONFIG_DIR` also moves
 `.claude.json`; Codex's `env_vars`, `bearer_token_env_var`, and
-`env_http_headers` keys; and whether Hermes interpolates variables in
-`config.yaml` (today it is assumed not to).
+`env_http_headers` keys; whether Hermes interpolates variables in
+`config.yaml` (today it is assumed not to); OMP's profile layout; OpenClaw's
+JSON5 config (pegboard rewrites only the `mcp` block); Cursor's required
+`type: "stdio"`; and Gemini's `httpUrl` vs `url` transports.
 
-Hermes has no known project scope: only `global` (and per profile, as the
-`hermes:<profile>` sub-target).
+Hermes and OpenClaw have no known project scope: only `global` (Hermes also
+per profile, as the `hermes:<profile>` sub-target).
 
 ### Later
 
-Cursor, Gemini CLI, Pi, Kiro, Copilot CLI… one at a time, on demand. The
+Kiro, GitHub Copilot CLI, Windsurf, Cline, Zed, Amp… one at a time, on demand. The
 competition is on correctness, not on the number of agents.
 
 ### Skills: how they are installed
@@ -490,14 +503,13 @@ and `drift` tools for agents that prefer tools over a shell.
 Each phase ends when I use it daily without frustration.
 
 ### Phase 0 — Skeleton ✅
-- Go repo, CI (lint + tests), `pegboard agents` detecting Claude Code, Codex,
-  opencode, and Hermes.
+- Go repo, CI (lint + tests), `pegboard agents` detecting the supported agents.
 - JSON Schema for `pegboard.yaml`.
 - **Done when:** `pegboard agents` lists what is installed on my machine
   correctly.
 
 ### Phase 1 — Local MCPs ✅
-- `init`, `plan`, `apply`, `drift` for MCPs across the 4 providers, global and
+- `init`, `plan`, `apply`, `drift` for MCPs across the providers, global and
   project scopes. State and backups. `env:` and `file:` secrets.
 - `import` from each agent.
 - Ad-hoc mode for MCPs: `install` / `uninstall`, `--save`, `origin: adhoc` in
@@ -525,7 +537,7 @@ Linux, macOS, and Windows binaries). Phases 3 and 4 come later.
 ### Phase 4 — TUI and extras
 - TUI (Bubble Tea): view targets, review the plan, apply.
 - `pegboard mcp` (pegboard's own MCP server).
-- More providers based on use.
+- More providers based on use (Kiro, GitHub Copilot CLI, Windsurf, Cline, Zed, Amp…).
 
 ### Later (no commitment)
 - Light UI (or Tapioca's as the first client).

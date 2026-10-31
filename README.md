@@ -1,15 +1,29 @@
 # Pegboard
 
 Configuration as Code for agents: declare in `pegboard.yaml` the MCPs, skills,
-and context you want in Claude Code, Codex, opencode, Hermes…, and `pegboard`
-applies them with `plan` / `apply` / `drift`, like Ansible + Terraform.
+and context you want in Claude Code, Codex, opencode, Hermes, Pi, OMP,
+OpenClaw, Cursor, Gemini CLI…, and `pegboard` applies them with `plan` / `apply` / `drift`, like Ansible + Terraform.
 
 Like the workshop pegboard: every tool has its silhouette, and at a glance you
 see what is missing.
 
 See [SPEC.md](SPEC.md). Status: MVP — MCPs, skills, and AGENTS.md in Claude
-Code, Codex, opencode, and Hermes. Remote stacks and the TUI arrive in phases
-3–4.
+Code, Codex, opencode, Hermes, Pi, OMP, OpenClaw, Cursor, and Gemini CLI.
+Remote stacks and the TUI arrive in phases 3–4.
+
+## Supported agents
+
+| Agent | MCPs | Skills | Context |
+|---|---|---|---|
+| Claude Code | yes | yes | `CLAUDE.md` bridge |
+| Codex | yes | yes | `AGENTS.md` |
+| opencode | yes | yes | `AGENTS.md` |
+| Hermes | yes | yes | `SOUL.md` (display only) |
+| Pi | yes | yes | `AGENTS.md` |
+| OMP (oh-my-pi) | yes | yes | `.omp/AGENTS.md` (display only) |
+| OpenClaw | yes (`mcp.servers`) | yes | workspace `AGENTS.md` (display only) |
+| Cursor | yes | yes | project `AGENTS.md` |
+| Gemini CLI | yes | yes | `GEMINI.md` (display only) |
 
 ## Usage
 

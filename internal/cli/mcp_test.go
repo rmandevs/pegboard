@@ -385,3 +385,33 @@ func TestImport(t *testing.T) {
 }
 
 func agentExists(p string) bool { _, err := os.Stat(p); return err == nil }
+
+func TestOpenClawJSON5(t *testing.T) {
+	m := agenttest.New(t)
+	m.Bins["openclaw"] = "1.0.0"
+	m.File("home/.openclaw/openclaw.json", `{
+  // keep this comment
+  channels: { discord: { enabled: true } },
+}
+`)
+	m.File("home/.config/pegboard/pegboard.yaml", `version: 1
+agents: [openclaw]
+mcps:
+  github:
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-github"]
+    env:
+      GITHUB_TOKEN: "${env:GITHUB_TOKEN}"
+`)
+	m.Vars["GITHUB_TOKEN"] = "ghp_secret"
+
+	out := mustRun(t, m, 0, "apply", "-y")
+	mustContain(t, "openclaw apply", out, "openclaw · global\n  + mcp github  (~/.openclaw/openclaw.json)")
+	cfg := read(t, m, "home/.openclaw/openclaw.json")
+	mustContain(t, "openclaw config", cfg, "// keep this comment", "channels", `"mcp"`, `"servers"`, `"github"`, `"GITHUB_TOKEN": "${GITHUB_TOKEN}"`)
+	if strings.Contains(cfg, "ghp_secret") {
+		t.Fatal("the config must not contain the secret value")
+	}
+	mustContain(t, "idempotent", mustRun(t, m, 0, "plan", "--exit-code"), "No changes")
+	mustRun(t, m, 0, "drift", "--exit-code")
+}

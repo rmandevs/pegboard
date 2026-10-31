@@ -1,6 +1,6 @@
 ---
 name: pegboard
-description: Install, remove, and sync MCPs, skills, and AGENTS.md in Claude Code, Codex, opencode, and Hermes with the `pegboard` CLI. Use it whenever the user asks to add, remove, list, or sync an MCP server or a skill across one or more agents ("add the Linear MCP", "install this skill on all my agents", "what MCPs do I have?"), or when the project has a pegboard.yaml.
+description: Install, remove, and sync MCPs, skills, and AGENTS.md in Claude Code, Codex, opencode, Hermes, Pi, OMP, OpenClaw, Cursor, and Gemini CLI with the `pegboard` CLI. Use it whenever the user asks to add, remove, list, or sync an MCP server or a skill across one or more agents ("add the Linear MCP", "install this skill on all my agents", "what MCPs do I have?"), or when the project has a pegboard.yaml.
 ---
 
 # pegboard
@@ -12,8 +12,9 @@ instead of editing those files yourself.
 ## Rules
 
 1. **Never edit by hand** `.mcp.json`, `~/.claude.json`, `.codex/config.toml`,
-   `opencode.json`, `~/.hermes/config.yaml`, or the skills directories
-   (`.claude/skills`, `.agents/skills`, …). Use `pegboard`.
+   `opencode.json`, `~/.hermes/config.yaml`, `~/.pi/agent/mcp.json`,
+   `.omp/mcp.json`, `~/.openclaw/openclaw.json`, `~/.cursor/mcp.json`,
+   `~/.gemini/settings.json`, or the skills directories. Use `pegboard`.
 2. **Plan first, then apply.** Run the command with `--json` without `-y`
    (or `pegboard plan --json`), summarize for the user what will change, and
    only then repeat with `-y`.
@@ -47,9 +48,10 @@ Is there a `pegboard.yaml` in the project (or in `~/.config/pegboard/`)?
   Add `--save` if the user wants it declared.
 
 Without `--agent`, everything goes to all detected agents; repeat `--agent`
-to limit it (`claude-code`, `codex`, `opencode`, `hermes`, `hermes:<profile>`).
+to limit it (`claude-code`, `codex`, `opencode`, `hermes`, `hermes:<profile>`,
+`pi`, `omp`, `omp:<profile>`, `openclaw`, `cursor`, `gemini`).
 `--scope global` is for the user; `--scope project` is for the current
-directory.
+directory. OpenClaw is global-only.
 
 ## Built-in skill
 
