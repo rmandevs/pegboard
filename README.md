@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.svg" alt="Pegboard" width="128">
+</p>
+
 # Pegboard
 
 Configuration as Code for agents: declare in `pegboard.yaml` the MCPs, skills,

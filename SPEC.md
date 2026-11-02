@@ -36,8 +36,8 @@ That is the whole product:
 | Seeing which silhouette is empty | `pegboard drift` |
 | Returning each tool to its silhouette | `pegboard apply` |
 
-**Icon:** a board with little holes, one hanging tool, and an empty
-silhouette next to it. It must read at 16 px.
+**Icon:** see [`assets/logo.svg`](assets/logo.svg): an isometric pegboard (a tile
+with a 3×3 grid of holes) stacked on two layers. It must read at 16 px.
 
 ### Why not something else
 
