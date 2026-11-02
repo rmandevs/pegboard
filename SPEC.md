@@ -70,6 +70,10 @@ silhouette next to it. It must read at 16 px.
   configured).
 - Managing models, provider API keys, or harness permissions.
 - Being a registry/marketplace of MCPs or skills.
+- Managing agent hooks. They differ too much between agents, and their
+  ownership does not fit a `name → entry` state.
+- Writing the contents of `AGENTS.md`. It belongs to the user; pegboard only
+  guarantees that it exists and that `CLAUDE.md` bridges to it (§7).
 
 ---
 
@@ -82,7 +86,7 @@ silhouette next to it. It must read at 16 px.
 | **Target** | An agent installed in a scope (for example, Claude Code × project) | host |
 | **Provider** | An agent adapter: it knows how to read, merge, and write its files | module / provider |
 | **Resource** | An MCP, a skill, or a context rule | resource / task |
-| **Remote stack** | A published stack (git repo) that another stack includes with `include` | Galaxy role / remote module |
+| **Included stack** | A stack (folder, git repo, or zip) that another stack pulls in with `include` (§3.5). There is no separate format: any `pegboard.yaml` can be included | Ansible role / Terraform module |
 | **State** | Record of what `pegboard` wrote to each target | `terraform.tfstate` |
 | **Lock** | Exact versions and hashes of what was resolved | `.terraform.lock.hcl` |
 
@@ -101,7 +105,8 @@ version: 1
 agents: [claude-code, codex, opencode, hermes]   # targets; default: detected ones
 inherit: global                                  # global | none (project only)
 
-include:                                         # remote stacks (phase 3)
+include:                                         # other stacks (phase 3, §3.5)
+  - ./stacks/web
   - github.com/rmandevs/stacks//web?ref=v1
 
 mcps:
@@ -128,16 +133,16 @@ remove:                                          # remove something inherited or
   mcps: [notion]
 ```
 
-Merge rules: `global` → `include` (in order) → project. Later entries win per
-key; `remove` is applied at the end.
+Merge rules, inside each scope: `include` (in order) → this file. Later entries
+win per key; `remove` is applied at the end. §3.5 has the details.
 
-In phase 1 each scope applies its own stack to its own targets: the global
-one to `~/.claude.json`, `~/.codex/config.toml`…; the project one to
-`.mcp.json`, `.codex/config.toml`… Agents already read the global config in
-addition to the project one, so copying the global one into every project
-would duplicate it. Without `--scope`, `plan`/`apply` work on the scopes that
-have a `pegboard.yaml`; `inherit: none` in the project excludes the global
-scope.
+The global and project stacks are never merged. Each scope applies its own
+stack to its own targets: the global one to `~/.claude.json`,
+`~/.codex/config.toml`…; the project one to `.mcp.json`, `.codex/config.toml`…
+Agents already read the global config in addition to the project one, so
+copying the global one into every project would duplicate it. Without
+`--scope`, `plan`/`apply` work on the scopes that have a `pegboard.yaml`;
+`inherit: none` in the project excludes the global scope.
 
 ### 3.2 Secrets
 
@@ -202,6 +207,90 @@ need the network. Local skills are not added to the lock.
 (project, in `.gitignore`). Per target it records which keys, files, and
 symlinks `pegboard` created and their hash. This is what enables principle 2
 and drift detection.
+
+### 3.5 `include`
+
+Status: designed for phase 3, not implemented. Until then, `include` is
+ignored with a warning.
+
+A stack packages MCPs and skills so they can be reproduced across agents,
+machines, and repos. Including one uses the same `pegboard.yaml` format, with
+that file at the root of what is included.
+
+**Sources**
+
+| Source | What it is |
+|---|---|
+| `./path`, `../path`, `~/path`, `/path` | A local directory, used as-is, without cache or lock |
+| `owner/repo`, `github.com/owner/repo//path`, `https://…`, `git@…` | A git repo, with the same conventions as skills, including `//path` and `?ref=` (§5). `owner/repo@skill` does not apply |
+| `./stack.zip`, `https://…/stack.zip` | A zip, local or over HTTPS. The stack is at the root of the zip or inside its single top-level directory |
+
+Zips are unpacked into the cache by content hash. An entry that escapes the
+destination, is a symlink, or exceeds the size limit makes the whole zip fail.
+
+**What an included stack contributes**
+
+| Key | Behavior |
+|---|---|
+| `mcps`, `skills` | Merged into the stack that includes it. An MCP's `agents:` restriction is kept |
+| `include` | Resolved first, depth first. A cycle is an error, as is exceeding 10 levels |
+| `remove` | Applies only to what that stack itself includes, never to its siblings or to the stack that includes it |
+| `policy` | Accumulates and cannot be relaxed: every `allow_mcps` list is checked against the final result |
+| `agents`, `inherit`, `context` | Ignored with a warning. The root stack decides these |
+
+**Merge**
+
+- MCPs: a later entry with the same name replaces the whole entry; there is no
+  deep merge.
+- Skills: sources are joined. If two different sources provide a skill with
+  the same name, it is an error unless `remove.skills` drops one, so `remove`
+  must be applied before that check.
+- The same source included twice is loaded once, at its first position. The
+  same repo and path with two different refs is an error.
+
+**Paths and trust**
+
+- Relative paths resolve against the stack that declares them, not the root
+  stack.
+- A stack from git or a zip cannot reach outside its own root: in `skills`,
+  `include`, and `${file:…}`, it can use neither `..` that escapes the root,
+  `~/`, nor absolute paths. Otherwise a third-party stack could read files
+  from the machine and pass them to an MCP.
+- It can use `${env:…}`, and the `plan` lists which variables it reads.
+- Included MCPs run third-party code on the machine, so the `plan` shows their
+  full command or URL and which stack each resource comes from:
+
+  ```
+  claude-code · project
+    + mcp github   (.mcp.json) npx -y @modelcontextprotocol/server-github
+                   via github.com/acme/stacks//web@v1
+  ```
+
+**Lock**
+
+The root stack's `pegboard.lock` pins the whole tree, including stacks and
+skills that were included indirectly. The lock of an included stack is
+ignored; a stack that needs an exact version declares it with `?ref=<commit>`.
+
+```json
+{
+  "version": 1,
+  "includes": {
+    "github.com/acme/stacks//web?ref=v1": { "commit": "3f2a…", "hash": "sha256:91c4…" },
+    "https://acme.dev/web.zip": { "hash": "sha256:7be0…" }
+  },
+  "skills": {}
+}
+```
+
+The rules from §3.3 apply: `apply` records new sources and fails if the content
+does not match its hash, and with a complete lock and cache it needs no network.
+`pegboard update` refreshes the includes and shows the resulting diff, including
+any new or changed MCP command. Skills inside a remote stack are covered by that
+stack's hash.
+
+**State** does not change. Included resources are recorded as `declared`, so
+removing an `include` shows up in the `plan` as a removal of its resources.
 
 ---
 
@@ -527,8 +616,8 @@ Linux, macOS, and Windows binaries). Phases 3 and 4 come later.
 - **Done when:** I ask an agent "add X to all of them" and it does it with
   `pegboard` without mistakes.
 
-### Phase 3 — Remote stacks and policies
-- `include` of git stacks with a lock; `policy.allow_mcps`.
+### Phase 3 — Included stacks and policies
+- `include` of local, git, and zip stacks with a lock (§3.5); `policy.allow_mcps`.
 - `op://` and `keychain:` secrets.
 - `--exit-code` for CI and a GitHub Action example.
 - **Done when:** I share a stack in a repo and another machine ends up the
