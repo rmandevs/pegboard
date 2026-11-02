@@ -25,10 +25,26 @@ Remote stacks and the TUI arrive in phases 3–4.
 | Cursor | yes | yes | project `AGENTS.md` |
 | Gemini CLI | yes | yes | `GEMINI.md` (display only) |
 
+## Install
+
+On Linux or macOS:
+
+```
+curl -fsSL https://raw.githubusercontent.com/rmandevs/pegboard/main/install.sh | sh
+```
+
+This verifies the release checksum and installs the binary to `~/.local/bin`.
+Set `PEGBOARD_INSTALL_DIR` to change the location or `PEGBOARD_VERSION=v0.1.0`
+to pin a version. To update, run it again.
+
+On Windows, download a binary from
+[Releases](https://github.com/rmandevs/pegboard/releases). With Go installed,
+you can also use
+`go install github.com/rmandevs/pegboard/cmd/pegboard@latest`.
+
 ## Usage
 
 ```
-go install github.com/rmandevs/pegboard/cmd/pegboard@latest
 pegboard skill install             # teach your agents to use pegboard
 pegboard skill uninstall           # remove that skill from your agents
 
