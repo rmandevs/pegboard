@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/rmandevs/agents-casc/internal/state"
+	"github.com/rmandevs/pegboard/internal/state"
 )
 
 // ContextFile is a context file the stack guarantees.

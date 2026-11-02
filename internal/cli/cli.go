@@ -9,8 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/rmandevs/agents-casc/internal/agent"
-	"github.com/rmandevs/agents-casc/providers"
+	"github.com/rmandevs/pegboard/internal/agent"
+	"github.com/rmandevs/pegboard/providers"
 )
 
 // Version is set at build time with -ldflags "-X …/internal/cli.Version=x.y.z";

@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/rmandevs/agents-casc/internal/agent"
-	"github.com/rmandevs/agents-casc/providers"
+	"github.com/rmandevs/pegboard/internal/agent"
+	"github.com/rmandevs/pegboard/providers"
 )
 
 func newAgentsCmd(opts *options, newEnv EnvFunc) *cobra.Command {

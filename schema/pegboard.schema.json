@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/rmandevs/agents-casc/main/schema/pegboard.schema.json",
+  "$id": "https://raw.githubusercontent.com/rmandevs/pegboard/main/schema/pegboard.schema.json",
   "title": "pegboard.yaml",
   "description": "Desired state of MCPs, skills, and context for agents (SPEC §3.1).",
   "type": "object",

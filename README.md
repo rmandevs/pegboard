@@ -28,7 +28,7 @@ Remote stacks and the TUI arrive in phases 3–4.
 ## Usage
 
 ```
-go install github.com/rmandevs/agents-casc/cmd/pegboard@latest
+go install github.com/rmandevs/pegboard/cmd/pegboard@latest
 pegboard skill install             # teach your agents to use pegboard
 pegboard skill uninstall           # remove that skill from your agents
 

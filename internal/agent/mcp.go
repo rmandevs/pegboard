@@ -3,9 +3,9 @@ package agent
 import (
 	"strconv"
 
-	"github.com/rmandevs/agents-casc/internal/mcp"
-	"github.com/rmandevs/agents-casc/internal/native"
-	"github.com/rmandevs/agents-casc/internal/secrets"
+	"github.com/rmandevs/pegboard/internal/mcp"
+	"github.com/rmandevs/pegboard/internal/native"
+	"github.com/rmandevs/pegboard/internal/secrets"
 )
 
 // MCPProvider is the part of Provider that handles MCPs: where they live and

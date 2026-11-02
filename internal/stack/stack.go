@@ -12,12 +12,12 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/rmandevs/agents-casc/internal/agent"
-	"github.com/rmandevs/agents-casc/internal/mcp"
-	"github.com/rmandevs/agents-casc/internal/native"
-	"github.com/rmandevs/agents-casc/internal/secrets"
-	"github.com/rmandevs/agents-casc/internal/skills"
-	"github.com/rmandevs/agents-casc/schema"
+	"github.com/rmandevs/pegboard/internal/agent"
+	"github.com/rmandevs/pegboard/internal/mcp"
+	"github.com/rmandevs/pegboard/internal/native"
+	"github.com/rmandevs/pegboard/internal/secrets"
+	"github.com/rmandevs/pegboard/internal/skills"
+	"github.com/rmandevs/pegboard/schema"
 )
 
 const FileName = "pegboard.yaml"
@@ -177,8 +177,8 @@ func SkillMatches(source, arg string) bool {
 // Template is the content of `pegboard init`.
 func Template(agents []string) string {
 	var b strings.Builder
-	b.WriteString("# Desired state for your agents. See https://github.com/rmandevs/agents-casc\n")
-	b.WriteString("# yaml-language-server: $schema=https://raw.githubusercontent.com/rmandevs/agents-casc/main/schema/pegboard.schema.json\n")
+	b.WriteString("# Desired state for your agents. See https://github.com/rmandevs/pegboard\n")
+	b.WriteString("# yaml-language-server: $schema=https://raw.githubusercontent.com/rmandevs/pegboard/main/schema/pegboard.schema.json\n")
 	b.WriteString("version: 1\n")
 	if len(agents) > 0 {
 		b.WriteString("agents: [" + strings.Join(agents, ", ") + "]\n")

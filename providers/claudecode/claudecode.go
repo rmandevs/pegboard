@@ -4,7 +4,7 @@ package claudecode
 import (
 	"path/filepath"
 
-	"github.com/rmandevs/agents-casc/internal/agent"
+	"github.com/rmandevs/pegboard/internal/agent"
 )
 
 type Provider struct{}

@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/rmandevs/agents-casc/internal/skills"
-	"github.com/rmandevs/agents-casc/internal/state"
+	"github.com/rmandevs/pegboard/internal/skills"
+	"github.com/rmandevs/pegboard/internal/state"
 )
 
 // SkillWant is a skill that must be in a directory. nil = it must not exist.

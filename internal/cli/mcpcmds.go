@@ -10,11 +10,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/rmandevs/agents-casc/internal/agent"
-	"github.com/rmandevs/agents-casc/internal/engine"
-	"github.com/rmandevs/agents-casc/internal/stack"
-	"github.com/rmandevs/agents-casc/internal/state"
-	"github.com/rmandevs/agents-casc/providers"
+	"github.com/rmandevs/pegboard/internal/agent"
+	"github.com/rmandevs/pegboard/internal/engine"
+	"github.com/rmandevs/pegboard/internal/stack"
+	"github.com/rmandevs/pegboard/internal/state"
+	"github.com/rmandevs/pegboard/providers"
 )
 
 func newInitCmd(opts *options, newEnv EnvFunc) *cobra.Command {

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rmandevs/agents-casc/internal/agent"
+	"github.com/rmandevs/pegboard/internal/agent"
 )
 
 // Machine is a fake machine: a home directory, a project directory, binaries

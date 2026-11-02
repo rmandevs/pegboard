@@ -1,9 +1,9 @@
 package hermes
 
 import (
-	"github.com/rmandevs/agents-casc/internal/agent"
-	"github.com/rmandevs/agents-casc/internal/mcp"
-	"github.com/rmandevs/agents-casc/internal/native"
+	"github.com/rmandevs/pegboard/internal/agent"
+	"github.com/rmandevs/pegboard/internal/mcp"
+	"github.com/rmandevs/pegboard/internal/native"
 )
 
 func (Provider) MCPFile(t agent.Target) native.File {

@@ -4,16 +4,16 @@ package providers
 import (
 	"sync"
 
-	"github.com/rmandevs/agents-casc/internal/agent"
-	"github.com/rmandevs/agents-casc/providers/claudecode"
-	"github.com/rmandevs/agents-casc/providers/codex"
-	"github.com/rmandevs/agents-casc/providers/cursor"
-	"github.com/rmandevs/agents-casc/providers/gemini"
-	"github.com/rmandevs/agents-casc/providers/hermes"
-	"github.com/rmandevs/agents-casc/providers/omp"
-	"github.com/rmandevs/agents-casc/providers/openclaw"
-	"github.com/rmandevs/agents-casc/providers/opencode"
-	"github.com/rmandevs/agents-casc/providers/pi"
+	"github.com/rmandevs/pegboard/internal/agent"
+	"github.com/rmandevs/pegboard/providers/claudecode"
+	"github.com/rmandevs/pegboard/providers/codex"
+	"github.com/rmandevs/pegboard/providers/cursor"
+	"github.com/rmandevs/pegboard/providers/gemini"
+	"github.com/rmandevs/pegboard/providers/hermes"
+	"github.com/rmandevs/pegboard/providers/omp"
+	"github.com/rmandevs/pegboard/providers/openclaw"
+	"github.com/rmandevs/pegboard/providers/opencode"
+	"github.com/rmandevs/pegboard/providers/pi"
 )
 
 // All lists the providers in display order.

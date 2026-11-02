@@ -14,7 +14,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/rmandevs/agents-casc/internal/state"
+	"github.com/rmandevs/pegboard/internal/state"
 )
 
 // Skill is a resolved skill: its exact content and where it lives on disk.

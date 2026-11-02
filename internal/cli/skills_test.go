@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rmandevs/agents-casc/internal/agent/agenttest"
-	"github.com/rmandevs/agents-casc/internal/skills"
+	"github.com/rmandevs/pegboard/internal/agent/agenttest"
+	"github.com/rmandevs/pegboard/internal/skills"
 )
 
 // gitHub creates local git repos that stand in for GitHub: acme/skills

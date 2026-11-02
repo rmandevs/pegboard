@@ -24,4 +24,4 @@ formatters:
   settings:
     goimports:
       local-prefixes:
-        - github.com/rmandevs/agents-casc
+        - github.com/rmandevs/pegboard

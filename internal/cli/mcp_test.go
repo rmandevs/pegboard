@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/rmandevs/agents-casc/internal/agent/agenttest"
+	"github.com/rmandevs/pegboard/internal/agent/agenttest"
 )
 
 const foreignClaude = `{

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/rmandevs/agents-casc/internal/state"
+	"github.com/rmandevs/pegboard/internal/state"
 )
 
 var symbols = map[Action]string{

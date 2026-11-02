@@ -15,7 +15,7 @@ import (
 //go:embed pegboard.schema.json
 var JSON []byte
 
-const url = "https://raw.githubusercontent.com/rmandevs/agents-casc/main/schema/pegboard.schema.json"
+const url = "https://raw.githubusercontent.com/rmandevs/pegboard/main/schema/pegboard.schema.json"
 
 var compiled = sync.OnceValues(func() (*jsonschema.Schema, error) {
 	doc, err := jsonschema.UnmarshalJSON(bytes.NewReader(JSON))

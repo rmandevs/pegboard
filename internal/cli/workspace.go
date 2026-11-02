@@ -6,15 +6,15 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/rmandevs/agents-casc/internal/agent"
-	"github.com/rmandevs/agents-casc/internal/engine"
-	"github.com/rmandevs/agents-casc/internal/mcp"
-	"github.com/rmandevs/agents-casc/internal/secrets"
-	"github.com/rmandevs/agents-casc/internal/skills"
-	"github.com/rmandevs/agents-casc/internal/stack"
-	"github.com/rmandevs/agents-casc/internal/state"
-	"github.com/rmandevs/agents-casc/providers"
-	"github.com/rmandevs/agents-casc/skill"
+	"github.com/rmandevs/pegboard/internal/agent"
+	"github.com/rmandevs/pegboard/internal/engine"
+	"github.com/rmandevs/pegboard/internal/mcp"
+	"github.com/rmandevs/pegboard/internal/secrets"
+	"github.com/rmandevs/pegboard/internal/skills"
+	"github.com/rmandevs/pegboard/internal/stack"
+	"github.com/rmandevs/pegboard/internal/state"
+	"github.com/rmandevs/pegboard/providers"
+	"github.com/rmandevs/pegboard/skill"
 )
 
 // scopeCtx is everything loaded for a scope.

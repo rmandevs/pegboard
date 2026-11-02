@@ -8,12 +8,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/rmandevs/agents-casc/internal/agent"
-	"github.com/rmandevs/agents-casc/internal/mcp"
-	"github.com/rmandevs/agents-casc/internal/native"
-	"github.com/rmandevs/agents-casc/internal/secrets"
-	"github.com/rmandevs/agents-casc/internal/stack"
-	"github.com/rmandevs/agents-casc/internal/state"
+	"github.com/rmandevs/pegboard/internal/agent"
+	"github.com/rmandevs/pegboard/internal/mcp"
+	"github.com/rmandevs/pegboard/internal/native"
+	"github.com/rmandevs/pegboard/internal/secrets"
+	"github.com/rmandevs/pegboard/internal/stack"
+	"github.com/rmandevs/pegboard/internal/state"
 )
 
 // found is an unmanaged MCP found in a target during import.

@@ -7,10 +7,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/rmandevs/agents-casc/internal/agent"
-	"github.com/rmandevs/agents-casc/internal/engine"
-	"github.com/rmandevs/agents-casc/internal/skills"
-	"github.com/rmandevs/agents-casc/internal/stack"
+	"github.com/rmandevs/pegboard/internal/agent"
+	"github.com/rmandevs/pegboard/internal/engine"
+	"github.com/rmandevs/pegboard/internal/skills"
+	"github.com/rmandevs/pegboard/internal/stack"
 )
 
 // editResult is the JSON output of add and remove.

@@ -1,4 +1,4 @@
-module github.com/rmandevs/agents-casc
+module github.com/rmandevs/pegboard
 
 go 1.27.3
 

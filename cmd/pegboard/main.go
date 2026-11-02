@@ -4,8 +4,8 @@ package main
 import (
 	"os"
 
-	"github.com/rmandevs/agents-casc/internal/agent"
-	"github.com/rmandevs/agents-casc/internal/cli"
+	"github.com/rmandevs/pegboard/internal/agent"
+	"github.com/rmandevs/pegboard/internal/cli"
 )
 
 func main() {
