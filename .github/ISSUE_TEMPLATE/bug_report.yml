@@ -1,0 +1,22 @@
+name: Bug report
+description: Something doesn't work as documented
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, and what happened instead. Remove any secrets from the output.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: pegboard --version
+    validations:
+      required: true
+  - type: input
+    id: agents
+    attributes:
+      label: Agent and operating system
+      placeholder: Claude Code on macOS
