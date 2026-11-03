@@ -277,8 +277,14 @@ func TestReplicateLinkedSkill(t *testing.T) {
 		t.Skip(err)
 	}
 	mustRun(t, m, 0, "replicate", "claude-code", "codex", "--scope", "global", "-y")
-	if got := linkOf(t, m, "home/.agents/skills/live"); got != filepath.Clean(m.Path("home/dev/live")) {
-		t.Errorf("a link to the user's own directory must stay live, got %s", got)
+	// Temp directories have other names once resolved: /private on macOS, the
+	// long form of a short path on Windows.
+	want, err := filepath.EvalSymlinks(m.Path("home/dev/live"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := linkOf(t, m, "home/.agents/skills/live"); got != want {
+		t.Errorf("a link to the user's own directory must stay live, got %s, want %s", got, want)
 	}
 }
 
