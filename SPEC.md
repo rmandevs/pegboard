@@ -122,7 +122,7 @@ mcps:
 skills:
   - mattpocock/skills@tdd                        # one skill from a GitHub repo
   - vercel-labs/agent-skills                     # all skills in the repo
-  - github.com/anthropics/skills//pdf?ref=main
+  - github.com/anthropics/skills//skills/pdf?ref=main
   - ./skills/my-skill                            # local
   - pegboard                                     # the built-in skill (§7)
   - source: ./skills/review                      # restrict to certain agents

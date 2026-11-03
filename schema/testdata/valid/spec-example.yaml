@@ -18,7 +18,7 @@ mcps:
 
 skills:
   - mattpocock/tdd
-  - github.com/anthropics/skills//pdf?ref=main
+  - github.com/anthropics/skills//skills/pdf?ref=main
   - ./skills/my-skill
 
 context:

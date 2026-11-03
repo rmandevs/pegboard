@@ -24,10 +24,10 @@ Remote stacks and the TUI arrive in phases 3–4.
 | opencode | yes | yes | `AGENTS.md` |
 | Hermes | yes | yes | `SOUL.md` (display only) |
 | Pi | yes | yes | `AGENTS.md` |
-| OMP (oh-my-pi) | yes | yes | `.omp/AGENTS.md` (display only) |
-| OpenClaw | yes (`mcp.servers`) | yes | workspace `AGENTS.md` (display only) |
+| OMP (oh-my-pi) | yes | yes | `.omp/AGENTS.md` (`replicate --context`) |
+| OpenClaw | yes (`mcp.servers`) | yes | workspace `AGENTS.md` (`replicate --context`) |
 | Cursor | yes | yes | project `AGENTS.md` |
-| Gemini CLI | yes | yes | `GEMINI.md` (display only) |
+| Gemini CLI | yes | yes | `GEMINI.md` (`replicate --context`) |
 
 ## Install
 
