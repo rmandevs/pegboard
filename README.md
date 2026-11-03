@@ -1,19 +1,106 @@
 <p align="center">
-  <img src="assets/logo.svg" alt="Pegboard" width="128">
+  <a href="https://usepegboard.dev"><img src="assets/logo.svg" alt="Pegboard" width="112"></a>
 </p>
 
-# Pegboard
+<h1 align="center">Pegboard</h1>
 
-Configuration as Code for agents: declare in `pegboard.yaml` the MCPs, skills,
-and context you want in Claude Code, Codex, opencode, Hermes, Pi, OMP,
-OpenClaw, Cursor, Gemini CLI…, and `pegboard` applies them with `plan` / `apply` / `drift`, like Ansible + Terraform.
+<p align="center">
+  <strong>Every tool in its place. On every agent.</strong><br>
+  Declare your MCPs, skills, and context in one file, and Pegboard writes each agent's native config.
+</p>
 
-Like the workshop pegboard: every tool has its silhouette, and at a glance you
-see what is missing.
+<p align="center">
+  <a href="https://github.com/rmandevs/pegboard/actions/workflows/ci.yml"><img src="https://github.com/rmandevs/pegboard/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/rmandevs/pegboard/releases/latest"><img src="https://img.shields.io/github/v/release/rmandevs/pegboard?color=444" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/rmandevs/pegboard?color=444" alt="MIT license"></a>
+</p>
 
-See [SPEC.md](SPEC.md). Status: MVP — MCPs, skills, and AGENTS.md in Claude
-Code, Codex, opencode, Hermes, Pi, OMP, OpenClaw, Cursor, and Gemini CLI.
-Remote stacks and the TUI arrive in phases 3–4.
+<p align="center">
+  <a href="https://usepegboard.dev">Website</a> ·
+  <a href="https://usepegboard.dev/docs/">Docs</a> ·
+  <a href="https://usepegboard.dev/docs/quick-start/">Quick start</a> ·
+  <a href="https://github.com/rmandevs/pegboard/releases">Releases</a>
+</p>
+
+---
+
+Every coding agent stores its MCPs and skills in a different place and format, so keeping them in sync means translating by hand. Pegboard does that translation with `plan`, `apply`, and `drift`, like Ansible and Terraform do for servers.
+
+Like a workshop pegboard, every tool has its silhouette, and at a glance you see what's missing.
+
+## Install
+
+On Linux or macOS:
+
+```sh
+curl -fsSL https://usepegboard.dev/install.sh | sh
+```
+
+The script verifies the release checksum and installs the binary to `~/.local/bin`. To update, run it again. You can [read the script](install.sh) first.
+
+On Windows, download a binary from [Releases](https://github.com/rmandevs/pegboard/releases). With Go, run `go install github.com/rmandevs/pegboard/cmd/pegboard@latest`.
+
+## Quick start
+
+Create a stack from a project directory:
+
+```sh
+pegboard init      # pegboard.yaml with the agents found on this machine
+pegboard import    # or adopt the MCPs your agents already have
+```
+
+Declare what you want in `pegboard.yaml`:
+
+```yaml
+version: 1
+agents: [claude-code, codex, opencode]
+
+mcps:
+  github:
+    command: npx
+    args: ["-y", "@modelcontextprotocol/server-github"]
+    env:
+      GITHUB_TOKEN: "${env:GITHUB_TOKEN}"
+  notion:
+    url: https://mcp.notion.com/mcp
+    agents: [claude-code]
+
+context:
+  agents_md: true
+```
+
+See what would change. `plan` writes nothing:
+
+```console
+$ pegboard plan
+claude-code · project
+  + mcp github                       (.mcp.json)
+  + mcp notion                       (.mcp.json)
+codex · project
+  + mcp github                       (.codex/config.toml)
+opencode · project
+  + mcp github                       (opencode.json)
+agents.md · project
+  + context AGENTS.md                (AGENTS.md)
+claude-code · project
+  + context @AGENTS.md in CLAUDE.md  (CLAUDE.md)
+Plan: 6 create, 0 update, 0 remove, 0 conflicts.
+```
+
+Then apply it, and check later that nobody edited those files by hand:
+
+```sh
+pegboard apply               # backs up every file it changes
+pegboard drift --exit-code   # also useful in CI
+```
+
+Already have one agent set up the way you like? Copy it to the others, with no YAML:
+
+```sh
+pegboard replicate claude-code codex opencode
+```
+
+Continue with the [quick start](https://usepegboard.dev/docs/quick-start/) or the [CLI reference](https://usepegboard.dev/docs/cli/).
 
 ## Supported agents
 
@@ -29,81 +116,28 @@ Remote stacks and the TUI arrive in phases 3–4.
 | Cursor | yes | yes | project `AGENTS.md` |
 | Gemini CLI | yes | yes | `GEMINI.md` (`replicate --context`) |
 
-## Install
+## What it does
 
-On Linux or macOS:
+- **Shows the plan first.** `plan` writes nothing, and `apply` backs up every file before changing it.
+- **Keeps secrets out of state.** Use `${env:X}` or `${file:path}`. Secrets are never written to state, and if an agent doesn't support references, the plan warns that they will be left in plain text.
+- **Pins skills.** Skills use the same sources as `npx skills` (`owner/repo`, `owner/repo@skill`, git URLs, `./local`). They're cached once, linked into each agent, and pinned by commit and hash in `pegboard.lock`.
+- **Works without a YAML file too.** Try something with one line, then keep it with `pegboard adopt`:
 
-```
-curl -fsSL https://raw.githubusercontent.com/rmandevs/pegboard/main/install.sh | sh
-```
+  ```sh
+  pegboard install mcp notion=https://mcp.notion.com/mcp --agent claude-code
+  pegboard install skill vercel-labs/agent-skills@web-design-guidelines
+  ```
 
-This verifies the release checksum and installs the binary to `~/.local/bin`.
-Set `PEGBOARD_INSTALL_DIR` to change the location or `PEGBOARD_VERSION=v0.1.0`
-to pin a version. To update, run it again.
+- **Teaches your agents to use it.** `pegboard skill install` gives them a skill for working with Pegboard.
 
-On Windows, download a binary from
-[Releases](https://github.com/rmandevs/pegboard/releases). With Go installed,
-you can also use
-`go install github.com/rmandevs/pegboard/cmd/pegboard@latest`.
+## Status
 
-## Usage
+Pegboard is an early MVP. It handles MCPs, skills, and context on the agents above. Remote stacks and a TUI are planned; see [SPEC.md](SPEC.md) for the design and phases.
 
-```
-pegboard skill install             # teach your agents to use pegboard
-pegboard skill uninstall           # remove that skill from your agents
+## Contributing
 
-pegboard agents                    # detected agents, paths, and version
-pegboard init                      # pegboard.yaml with this project's agents
-pegboard import                    # or adopt the MCPs your agents already have
-pegboard replicate claude-code codex opencode   # give other agents what any one already has
-pegboard plan                      # what would change (+ ~ - = !); writes nothing
-pegboard apply                     # applies it, backing up every file
-pegboard drift --exit-code         # did anyone edit pegboard-managed files by hand?
-pegboard add skill mattpocock/skills@tdd   # edits pegboard.yaml; then plan/apply
-pegboard update                    # new skill versions, with a diff
+Bug reports and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) to get set up, and [SECURITY.md](SECURITY.md) to report a vulnerability privately.
 
-# Ad-hoc mode: no YAML, one line
-pegboard install mcp github='npx -y @modelcontextprotocol/server-github' \
-                 --env GITHUB_TOKEN='${env:GITHUB_TOKEN}'
-pegboard install mcp notion=https://mcp.notion.com/mcp --agent claude-code --save
-pegboard install skill vercel-labs/agent-skills@web-design-guidelines
-pegboard uninstall mcp github
-pegboard adopt                     # move ad-hoc installs into pegboard.yaml
-```
+## License
 
-Skills use the same sources as `npx skills` / skills.sh (`owner/repo`,
-`owner/repo@skill`, git URLs, `./local`). They are downloaded once to
-`~/.cache/pegboard`, linked into each agent, and pinned by commit and hash in
-`pegboard.lock`.
-
-Common flags: `--scope global|project`, `--agent <id>` (repeatable),
-`--json`, `--dir`. Secrets use `${env:X}` or `${file:path}` and are never
-written to state; if the agent does not support references, the plan warns
-that they will be left in plain text.
-
-## Releases
-
-`git tag v0.1.0 && git push origin v0.1.0` runs
-`.github/workflows/release.yml`, which publishes Linux, macOS, and Windows
-(amd64/arm64) binaries with goreleaser.
-
-## Development
-
-```
-go test ./...
-golangci-lint run ./...
-```
-
-- `cmd/pegboard/` entry point · `internal/cli/` commands · `internal/agent/`
-  shared types and `Env` · `providers/<id>/` one package per agent (detection
-  and MCP translation).
-- `internal/skills/` sources, discovery, cache, and `pegboard.lock` ·
-  `skill/SKILL.md` the built-in skill (embedded).
-- `internal/engine/` plan, apply, and drift (MCPs, skills, and context) ·
-  `internal/native/` JSON/TOML/YAML editors that only touch the MCP key ·
-  `internal/state/` state, atomic writes, and backups · `internal/stack/`
-  pegboard.yaml · `internal/secrets/` `${…}` references.
-- `schema/pegboard.schema.json` is the JSON Schema for `pegboard.yaml`; the
-  cases in `schema/testdata/{valid,invalid}/` are validated in the tests.
-- No test touches the real machine: `internal/agent/agenttest` builds a fake
-  home and project in `t.TempDir()`.
+[MIT](LICENSE)

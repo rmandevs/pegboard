@@ -1,7 +1,7 @@
 #!/bin/sh
 # Install the latest pegboard release on Linux or macOS:
 #
-#   curl -fsSL https://raw.githubusercontent.com/rmandevs/pegboard/main/install.sh | sh
+#   curl -fsSL https://usepegboard.dev/install.sh | sh
 #
 # Environment:
 #   PEGBOARD_VERSION      version to install, e.g. v0.1.0 (default: latest)
