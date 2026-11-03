@@ -217,7 +217,7 @@ func TestSkillsAdhocAndAdopt(t *testing.T) {
 	}
 	out = mustRun(t, m, 0, "adopt")
 	mustContain(t, "adopt", out, "Adopted into pegboard.yaml:", "+ mcp fs (claude-code)", "+ skill acme/skills")
-	mustContain(t, "yaml", read(t, m, "proj/pegboard.yaml"), "skills:\n  - acme/skills\n", "fs:\n    command: npx")
+	mustContain(t, "yaml", read(t, m, "proj/pegboard.yaml"), "skills:\n  - source: acme/skills\n    agents:\n      - claude-code\n", "fs:\n    command: npx")
 	st := read(t, m, "proj/.pegboard/state.json")
 	if strings.Contains(st, `"adhoc"`) {
 		t.Errorf("after adopt nothing remains ad-hoc:\n%s", st)

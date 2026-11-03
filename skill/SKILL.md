@@ -15,9 +15,9 @@ instead of editing those files yourself.
    `opencode.json`, `~/.hermes/config.yaml`, `~/.pi/agent/mcp.json`,
    `.omp/mcp.json`, `~/.openclaw/openclaw.json`, `~/.cursor/mcp.json`,
    `~/.gemini/settings.json`, or the skills directories. Use `pegboard`.
-2. **Plan first, then apply.** Run the command with `--json` without `-y`
-   (or `pegboard plan --json`), summarize for the user what will change, and
-   only then repeat with `-y`.
+2. **Plan first, then apply.** Run the command with `--dry-run --json` (or
+   `pegboard plan --json` for a stack), summarize for the user what will change,
+   and only then repeat it with `-y --json`.
 3. **Conflicts (`"action": "conflict"`): ask.** It means someone edited by
    hand something pegboard manages, or something with that name already
    exists that pegboard did not create. Explain the `reason` and ask before
@@ -41,6 +41,7 @@ Is there a `pegboard.yaml` in the project (or in `~/.config/pegboard/`)?
   ```
 - **No → ad-hoc.** Install now, without YAML:
   ```
+  pegboard install mcp github='npx -y @modelcontextprotocol/server-github' --env GITHUB_TOKEN='${env:GITHUB_TOKEN}' --dry-run --json
   pegboard install mcp github='npx -y @modelcontextprotocol/server-github' --env GITHUB_TOKEN='${env:GITHUB_TOKEN}' --json -y
   pegboard install skill mattpocock/skills@tdd -y
   pegboard uninstall mcp github -y
@@ -52,6 +53,24 @@ to limit it (`claude-code`, `codex`, `opencode`, `hermes`, `hermes:<profile>`,
 `pi`, `omp`, `omp:<profile>`, `openclaw`, `cursor`, `gemini`).
 `--scope global` is for the user; `--scope project` is for the current
 directory. OpenClaw is global-only.
+
+## Copy one agent's setup to others
+
+When the user asks to move or copy their setup ("give Codex what Claude Code
+has"), use `replicate`. The first agent can be any of them, and it is not changed:
+
+```
+pegboard replicate claude-code codex opencode --dry-run --json   # summarize for the user
+pegboard replicate claude-code codex opencode -y --json
+```
+
+Tell the user which variables to export: their secrets become `${env:…}`
+references.
+
+Context files are left alone unless you pass `--context`. Ask the user where the
+source's text should go before using it: `before` or `after` what each target
+already has, or `replace` it (the file is backed up). `--dry-run` shows the
+result without writing.
 
 ## Built-in skill
 

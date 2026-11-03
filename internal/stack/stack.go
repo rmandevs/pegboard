@@ -29,7 +29,7 @@ type Stack struct {
 	Inherit string             `yaml:"inherit"`
 	Include []string           `yaml:"include"`
 	MCPs    map[string]mcp.MCP `yaml:"mcps"`
-	Skills  []string           `yaml:"skills"`
+	Skills  []SkillRef         `yaml:"skills"`
 	Context struct {
 		AgentsMD bool `yaml:"agents_md"`
 	} `yaml:"context"`
@@ -42,6 +42,39 @@ type Stack struct {
 	} `yaml:"policy"`
 
 	Path string `yaml:"-"`
+}
+
+// SkillRef is one entry of skills:, a source that may be limited to some agents.
+type SkillRef struct {
+	Source string   `yaml:"source"`
+	Agents []string `yaml:"agents,omitempty"`
+}
+
+// UnmarshalYAML reads the short form (a string) or the long one.
+func (r *SkillRef) UnmarshalYAML(n *yaml.Node) error {
+	if n.Kind == yaml.ScalarNode {
+		return n.Decode(&r.Source)
+	}
+	type long SkillRef
+	return n.Decode((*long)(r))
+}
+
+// MarshalYAML writes the short form when no agents limit the skill.
+func (r SkillRef) MarshalYAML() (any, error) {
+	if len(r.Agents) == 0 {
+		return r.Source, nil
+	}
+	type long SkillRef
+	return long(r), nil
+}
+
+// SkillSources lists the declared sources.
+func (s *Stack) SkillSources() []string {
+	out := make([]string, len(s.Skills))
+	for i, r := range s.Skills {
+		out[i] = r.Source
+	}
+	return out
 }
 
 // Path is the stack path for a scope.
@@ -69,7 +102,7 @@ func Load(path string) (*Stack, error) {
 	if err := yaml.Unmarshal(src, s); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
-	for _, src := range s.Skills {
+	for _, src := range s.SkillSources() {
 		if _, err := skills.Parse(src); err != nil {
 			return nil, fmt.Errorf("%s: skills: %w", path, err)
 		}
@@ -253,36 +286,47 @@ func (e *Editor) HasMCP(name string) bool {
 	return ok
 }
 
-// Skills lists the declared sources.
-func (e *Editor) Skills() []string { return e.doc.StringList("skills") }
+// Skills lists the declared skills.
+func (e *Editor) Skills() ([]SkillRef, error) {
+	var l []SkillRef
+	return l, e.doc.List("skills", &l)
+}
 
-// AddSkill adds a source if it was not already there; it reports whether it
-// was added.
-func (e *Editor) AddSkill(source string) (bool, error) {
-	l := e.Skills()
-	for _, s := range l {
-		if s == source {
+// AddSkill adds a source if it was not already there, limited to agents if any;
+// it reports whether it was added.
+func (e *Editor) AddSkill(source string, agents []string) (bool, error) {
+	l, err := e.Skills()
+	if err != nil {
+		return false, err
+	}
+	for _, r := range l {
+		if r.Source == source {
 			return false, nil
 		}
 	}
-	return true, e.doc.SetStringList("skills", append(l, source))
+	return true, e.doc.SetList("skills", append(l, SkillRef{Source: source, Agents: agents}), false)
 }
 
 // RemoveSkill removes the sources that correspond to arg; it returns which
 // ones were removed.
 func (e *Editor) RemoveSkill(arg string) ([]string, error) {
-	var keep, gone []string
-	for _, s := range e.Skills() {
-		if SkillMatches(s, arg) {
-			gone = append(gone, s)
+	l, err := e.Skills()
+	if err != nil {
+		return nil, err
+	}
+	var keep []SkillRef
+	var gone []string
+	for _, r := range l {
+		if SkillMatches(r.Source, arg) {
+			gone = append(gone, r.Source)
 		} else {
-			keep = append(keep, s)
+			keep = append(keep, r)
 		}
 	}
 	if len(gone) == 0 {
 		return nil, nil
 	}
-	return gone, e.doc.SetStringList("skills", keep)
+	return gone, e.doc.SetList("skills", keep, len(keep) == 0)
 }
 
 // Save validates the result against the schema before writing it.

@@ -17,6 +17,9 @@ import (
 type SkillWant struct {
 	Skill  skills.Skill
 	Origin state.Origin
+	// Prepare, if set, runs before the skill is placed: it makes Skill.Dir
+	// exist, so a plan that is not applied writes nothing.
+	Prepare func() error
 }
 
 // SkillDir is a skills directory and the targets that read it: Codex and
@@ -112,7 +115,13 @@ func (p *Plan) skillDir(sc Scope, sd SkillDir, opts Options) error {
 			}
 			c.do = resolve(c.Action, c.Forced, opts.Force)
 			dir, ent := sd.Dir, entry
+			prepare := want.Prepare
 			c.run = func() error {
+				if prepare != nil {
+					if err := prepare(); err != nil {
+						return err
+					}
+				}
 				copied, err := placeSkill(dest, sk.Dir, obs.exists)
 				ent.Copy = copied
 				return err

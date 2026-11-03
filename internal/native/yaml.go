@@ -175,6 +175,9 @@ type ListDoc interface {
 	Doc
 	StringList(key string) []string
 	SetStringList(key string, l []string) error
+	// List decodes a top-level list into out; SetList replaces it.
+	List(key string, out any) error
+	SetList(key string, l any, empty bool) error
 }
 
 func (d *yamlDoc) StringList(key string) []string {
@@ -187,14 +190,26 @@ func (d *yamlDoc) StringList(key string) []string {
 	return out
 }
 
+func (d *yamlDoc) List(key string, out any) error {
+	i := lookup(d.root, key)
+	if i < 0 {
+		return nil
+	}
+	return d.root.Content[i+1].Decode(out)
+}
+
 func (d *yamlDoc) SetStringList(key string, l []string) error {
+	return d.SetList(key, l, len(l) == 0)
+}
+
+func (d *yamlDoc) SetList(key string, l any, empty bool) error {
 	n, err := toNode(l)
 	if err != nil {
 		return err
 	}
 	d.changed = true
 	i := lookup(d.root, key)
-	if len(l) == 0 {
+	if empty {
 		if i >= 0 {
 			d.root.Content = append(d.root.Content[:i], d.root.Content[i+2:]...)
 		}

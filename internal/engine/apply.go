@@ -62,10 +62,17 @@ func Apply(p *Plan, backupDir string, now time.Time) (*Result, error) {
 		}
 		switch c.do {
 		case Create, Update, Delete:
+			bk := ""
+			if c.backup {
+				var err error
+				if bk, err = state.Backup(backupDir, now, c.File); err != nil {
+					return res, err
+				}
+			}
 			if err := c.run(); err != nil {
 				return res, fmt.Errorf("%s: %w", c.File, err)
 			}
-			res.Written = append(res.Written, Written{File: c.File})
+			res.Written = append(res.Written, Written{File: c.File, Backup: bk})
 		}
 	}
 	for _, sc := range p.scopes {

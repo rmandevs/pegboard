@@ -88,7 +88,7 @@ func newAddCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 				r.Added = append(r.Added, "mcp "+name)
 			}
 			for _, src := range sources {
-				added, err := ed.AddSkill(src)
+				added, err := ed.AddSkill(src, opts.agents)
 				if err != nil {
 					return err
 				}
@@ -220,7 +220,7 @@ func newUpdateCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 				}
 				r := c.skillResolver(c.lock)
 				r.Update = true
-				for _, src := range c.stack.Skills {
+				for _, src := range c.stack.SkillSources() {
 					if !matchesAny(src, args) {
 						continue
 					}

@@ -55,6 +55,7 @@ pegboard skill uninstall           # remove that skill from your agents
 pegboard agents                    # detected agents, paths, and version
 pegboard init                      # pegboard.yaml with this project's agents
 pegboard import                    # or adopt the MCPs your agents already have
+pegboard replicate claude-code codex opencode   # give other agents what any one already has
 pegboard plan                      # what would change (+ ~ - = !); writes nothing
 pegboard apply                     # applies it, backing up every file
 pegboard drift --exit-code         # did anyone edit pegboard-managed files by hand?

@@ -125,6 +125,8 @@ skills:
   - github.com/anthropics/skills//pdf?ref=main
   - ./skills/my-skill                            # local
   - pegboard                                     # the built-in skill (§7)
+  - source: ./skills/review                      # restrict to certain agents
+    agents: [codex, opencode]
 
 context:
   agents_md: true                                # guarantees AGENTS.md and the CLAUDE.md bridge
@@ -299,6 +301,7 @@ removing an `include` shows up in the `plan` as a removal of its resources.
 ```
 pegboard init                     # creates pegboard.yaml (detects installed agents)
 pegboard import [--agent X]       # adopts the agents' existing config into pegboard.yaml
+pegboard replicate <source> <target>…  # gives other agents what one agent has (§4.2)
 pegboard plan                     # diff of what would change; writes nothing
 pegboard apply [-y]               # applies the plan (asks for confirmation without -y)
 pegboard drift [--exit-code]      # compares state vs. real files (for CI)
@@ -362,6 +365,30 @@ Rules:
    except with `--strict` (useful in CI).
 5. **Default scope:** `project` if there is a `pegboard.yaml` or a git repo in
    the current directory; otherwise `global`. It can be forced with `--scope`.
+
+### 4.2 Replicating one agent to others
+
+`pegboard replicate claude-code codex opencode` reads the MCPs and skills of the
+source agent, which can be any detected agent, and installs them on the targets,
+in each scope where the source exists. It is ad-hoc mode with the source's contents as its input: same plan,
+state, and backups, no `pegboard.yaml` needed, and `pegboard adopt` promotes the
+result later. `--dry-run` shows the plan without writing.
+
+- **The source is read-only.** Unlike `import`, nothing about it changes, so it
+  keeps working even if the secrets it holds in plain text are never exported.
+- **Secrets become references** on the targets, as in `import`: they are not
+  copied. An agent that can only store plain text fails until the variable is
+  exported, because there is no value to write.
+- **Skills.** One pegboard placed keeps its source and content. A link to a
+  directory of the user's stays a link to that directory. Anything else is copied
+  on apply to `~/.config/pegboard/skills/<name>` (`./skills/<name>` in a project),
+  so removing it from one agent never takes it from another.
+- **Context** goes where `--context` says: `before` or `after` what the target
+  has, in a marked block that a later run updates instead of adding again, or
+  `replace`, which leaves only the source's text. The file is backed up first.
+  Without the flag it asks, unless `-y`, `--json`, or `--dry-run` were passed:
+  then it leaves context alone and warns. Hermes is left out both ways, because
+  `SOUL.md` is its persona rather than instructions for a project.
 
 ---
 

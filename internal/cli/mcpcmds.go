@@ -73,6 +73,7 @@ type applyFlags struct {
 	force      bool
 	exitCode   bool
 	pruneAdhoc bool
+	dryRun     bool
 }
 
 func newPlanCmd(opts *options, newEnv EnvFunc) *cobra.Command {
@@ -143,6 +144,7 @@ func runDeclarative(cmd *cobra.Command, opts *options, newEnv EnvFunc, f *applyF
 func execute(cmd *cobra.Command, opts *options, env agent.Env, scopes []engine.Scope, warnings []string,
 	f *applyFlags, apply bool, after func() error) error {
 	out := cmd.OutOrStdout()
+	apply = apply && !f.dryRun
 	if apply && opts.json && !f.yes {
 		return errors.New("--json requires -y: there is no one to ask")
 	}

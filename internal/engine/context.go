@@ -124,3 +124,100 @@ func baseName(p string) string {
 	}
 	return p
 }
+
+// ContextMode is where replicated context goes in the target's file.
+type ContextMode string
+
+const (
+	ContextBefore  ContextMode = "before"
+	ContextAfter   ContextMode = "after"
+	ContextReplace ContextMode = "replace"
+)
+
+// ContextCopy puts a source agent's context into a target's file. Before and
+// after keep it in a marked block, so a later run updates it instead of adding
+// it again; replace leaves only the source's text.
+type ContextCopy struct {
+	Path    string
+	Target  string
+	Source  string // the source agent, which names the block
+	Content string
+	Mode    ContextMode
+}
+
+func (p *Plan) contextCopy(sc Scope, cc ContextCopy) error {
+	data, err := os.ReadFile(cc.Path)
+	exists := err == nil
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	next := MergeContext(string(data), cc)
+	if exists && next == string(data) {
+		return nil
+	}
+	action := Create
+	if exists {
+		action = Update
+	}
+	path := cc.Path
+	p.Changes = append(p.Changes, Change{
+		Scope: sc.Scope, Target: cc.Target, Kind: "context", Name: baseName(path), File: path,
+		Action: action, do: action, backup: true,
+		Detail: "← " + cc.Source + ", " + string(cc.Mode),
+		run:    func() error { return state.WriteAtomic(path, []byte(next), 0o644) },
+		commit: func(*state.State) {},
+	})
+	return nil
+}
+
+const blockPrefix = "<!-- pegboard:replicated from "
+
+func blockMarks(source string) (string, string) {
+	return blockPrefix + source + " -->", "<!-- /pegboard:replicated from " + source + " -->"
+}
+
+// MergeContext is the target's text once cc is applied. An existing block from
+// the same source is updated where it is.
+func MergeContext(current string, cc ContextCopy) string {
+	content := strings.TrimSpace(cc.Content)
+	if cc.Mode == ContextReplace {
+		return content + "\n"
+	}
+	open, end := blockMarks(cc.Source)
+	block := open + "\n\n" + content + "\n\n" + end
+	if i := strings.Index(current, open); i >= 0 {
+		if j := strings.Index(current[i:], end); j >= 0 {
+			return current[:i] + block + current[i+j+len(end):]
+		}
+	}
+	rest := strings.TrimSpace(current)
+	switch {
+	case rest == "":
+		return block + "\n"
+	case cc.Mode == ContextBefore:
+		return block + "\n\n" + strings.TrimLeft(current, "\r\n")
+	}
+	return strings.TrimRight(current, " \t\r\n") + "\n\n" + block + "\n"
+}
+
+// ContextPresent reports whether the target already has this content, in any
+// mode, so there is nothing to ask about.
+func ContextPresent(current, source, content string) bool {
+	content = strings.TrimSpace(content)
+	open, end := blockMarks(source)
+	return strings.TrimSpace(current) == content || strings.Contains(current, open+"\n\n"+content+"\n\n"+end)
+}
+
+// CleanContext prepares a source's text for copying: without the bridge line
+// pegboard adds to CLAUDE.md, or the marks of blocks replicated into it.
+func CleanContext(content string) string {
+	var out []string
+	for _, l := range strings.Split(strings.ReplaceAll(content, "\r\n", "\n"), "\n") {
+		t := strings.TrimSpace(l)
+		if t == "@AGENTS.md" || strings.HasPrefix(t, blockPrefix) || strings.HasPrefix(t, "<!-- /pegboard:replicated from ") {
+			continue
+		}
+		out = append(out, l)
+	}
+	return strings.TrimSpace(strings.Join(out, "\n"))
+}

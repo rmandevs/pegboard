@@ -52,6 +52,8 @@ type Scope struct {
 	Targets  []Target
 	Skills   []SkillDir
 	Context  []ContextFile
+	// ContextCopies are context files replicated from another agent.
+	ContextCopies []ContextCopy
 }
 
 // Change is one line of the plan.
@@ -78,6 +80,7 @@ type Change struct {
 	entry  state.Entry
 	do     Action // what Apply will do; "" in an unresolved conflict
 	silent bool   // only changes state (for example, origin); not shown
+	backup bool   // run overwrites a file of the user's: back it up first
 	// run writes to disk (skills, context); commit updates state.
 	run    func() error
 	commit func(*state.State)
@@ -124,6 +127,11 @@ func Compute(scopes []Scope, opts Options) (*Plan, error) {
 		}
 		for _, cf := range sc.Context {
 			if err := p.context(sc, cf); err != nil {
+				return nil, err
+			}
+		}
+		for _, cc := range sc.ContextCopies {
+			if err := p.contextCopy(sc, cc); err != nil {
 				return nil, err
 			}
 		}

@@ -143,7 +143,7 @@ github.com/owner/repo//path?ref=v1, a git URL, a local ./path, or pegboard.`,
 						}
 					}
 					for _, src := range sources {
-						if _, err := ed.AddSkill(src); err != nil {
+						if _, err := ed.AddSkill(src, opts.agents); err != nil {
 							return err
 						}
 					}
@@ -167,6 +167,7 @@ github.com/owner/repo//path?ref=v1, a git URL, a local ./path, or pegboard.`,
 	cmd.Flags().StringArrayVar(&envs, "env", nil, "variable for stdio MCPs: K=V (repeatable; V may be ${env:X})")
 	cmd.Flags().StringArrayVar(&headers, "header", nil, "header for http MCPs: K=V (repeatable)")
 	cmd.Flags().BoolVar(&save, "save", false, "also add it to pegboard.yaml")
+	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "show the plan and write nothing")
 	cmd.Flags().BoolVarP(&f.yes, "yes", "y", false, "do not ask for confirmation")
 	cmd.Flags().BoolVar(&f.force, "force", false, "overwrite anything that already exists")
 	return cmd
@@ -436,6 +437,7 @@ func newUninstallCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 			return execute(cmd, opts, env, []engine.Scope{engScope}, nil, f, true, nil)
 		},
 	}
+	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "show the plan and write nothing")
 	cmd.Flags().BoolVarP(&f.yes, "yes", "y", false, "do not ask for confirmation")
 	cmd.Flags().BoolVar(&f.force, "force", false, "remove even if it was edited by hand")
 	return cmd

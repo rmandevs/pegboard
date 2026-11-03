@@ -238,7 +238,7 @@ func (c *scopeCtx) declarative(pruneAdhoc bool) (engine.Scope, []string, func() 
 	agentsMD := false
 	if c.stack != nil {
 		listed = c.stack.Agents
-		declared = c.stack.Skills
+		declared = c.stack.SkillSources()
 		agentsMD = c.stack.Context.AgentsMD
 	}
 	selected := func(t agent.Target) bool { return mcp.Matches(listed, t.Agent, t.ID()) }
@@ -246,6 +246,12 @@ func (c *scopeCtx) declarative(pruneAdhoc bool) (engine.Scope, []string, func() 
 	resolved, err := resolveSkills(c.skillResolver(lock), declared)
 	if err != nil {
 		return engScope, warnings, nil, err
+	}
+	limits := map[string][]string{}
+	if c.stack != nil {
+		for _, r := range c.stack.Skills {
+			limits[r.Source] = r.Agents
+		}
 	}
 	wants := map[string]*engine.SkillWant{}
 	for _, sk := range resolved {
@@ -257,7 +263,13 @@ func (c *scopeCtx) declarative(pruneAdhoc bool) (engine.Scope, []string, func() 
 		if !selected(t) {
 			return nil
 		}
-		return wants
+		out := map[string]*engine.SkillWant{}
+		for name, w := range wants {
+			if mcp.Matches(limits[w.Skill.Source], t.Agent, t.ID()) {
+				out[name] = w
+			}
+		}
+		return out
 	}, func(e state.SkillEntry) bool { return e.Origin == state.Declared || pruneAdhoc })
 
 	if c.scope == agent.Global && agentsMD {

@@ -84,6 +84,7 @@ func newRoot(stdin io.Reader, stdout, stderr io.Writer, newEnv EnvFunc) *cobra.C
 		newApplyCmd(opts, newEnv),
 		newDriftCmd(opts, newEnv),
 		newImportCmd(opts, newEnv),
+		newReplicateCmd(opts, newEnv),
 		newInstallCmd(opts, newEnv),
 		newUninstallCmd(opts, newEnv),
 		newAddCmd(opts, newEnv),

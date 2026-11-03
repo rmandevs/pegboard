@@ -33,9 +33,22 @@
       "additionalProperties": { "$ref": "#/$defs/mcp" }
     },
     "skills": {
-      "description": "Skills: owner/name, git URL (host/repo//path?ref=x), or local path (./…).",
+      "description": "Skills: owner/name, git URL (host/repo//path?ref=x), or local path (./…). An object limits a source to some agents.",
       "type": "array",
-      "items": { "type": "string", "minLength": 1 },
+      "items": {
+        "oneOf": [
+          { "type": "string", "minLength": 1 },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source"],
+            "properties": {
+              "source": { "type": "string", "minLength": 1 },
+              "agents": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1, "uniqueItems": true }
+            }
+          }
+        ]
+      },
       "uniqueItems": true
     },
     "context": {

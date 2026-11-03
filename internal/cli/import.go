@@ -174,7 +174,7 @@ func importScope(c *scopeCtx, out interface{ Write([]byte) (int, error) }, env a
 		imported = append(imported, fmt.Sprintf("mcp %s (%s)", name, targetIDs(targetsOf(same))))
 	}
 	for _, src := range adhocSkills {
-		if _, err := ed.AddSkill(src); err != nil {
+		if _, err := ed.AddSkill(src, c.agentsWithSkill(src)); err != nil {
 			return 0, err
 		}
 		for _, d := range c.state.SkillDirs() {
@@ -210,6 +210,24 @@ func importScope(c *scopeCtx, out interface{ Write([]byte) (int, error) }, env a
 		fmt.Fprintf(out, "Secrets were replaced with ${env:…}; export: %s\n", strings.Join(vars, ", "))
 	}
 	return len(imported), nil
+}
+
+// agentsWithSkill lists the targets that have the source's ad-hoc skill, or
+// nil if all of them do: adopting it must not spread it to other agents.
+func (c *scopeCtx) agentsWithSkill(source string) []string {
+	var out []string
+	for _, t := range c.targets {
+		for _, n := range c.state.SkillNames(t.Paths.Skills) {
+			if e, _ := c.state.Skill(t.Paths.Skills, n); e.Source == source {
+				out = append(out, t.ID())
+				break
+			}
+		}
+	}
+	if len(out) == len(c.targets) {
+		return nil
+	}
+	return out
 }
 
 func targetsOf(fs []found) []agent.Target {
