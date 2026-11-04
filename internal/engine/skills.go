@@ -17,6 +17,8 @@ import (
 type SkillWant struct {
 	Skill  skills.Skill
 	Origin state.Origin
+	// Via is the included stack that declares it ("" = the stack itself).
+	Via string
 	// Prepare, if set, runs before the skill is placed: it makes Skill.Dir
 	// exist, so a plan that is not applied writes nothing.
 	Prepare func() error
@@ -85,6 +87,7 @@ func (p *Plan) skillDir(sc Scope, sd SkillDir, opts Options) error {
 		if want != nil {
 			sk := want.Skill
 			c.Origin = want.Origin
+			c.Via = want.Via
 			c.Detail = "→ cache@" + Short(sk.Hash)
 			if sk.Local {
 				c.Detail, c.Link = "", sk.Dir
@@ -114,6 +117,11 @@ func (p *Plan) skillDir(sc Scope, sd SkillDir, opts Options) error {
 				c.Action = Create
 			}
 			c.do = resolve(c.Action, c.Forced, opts.Force)
+			if c.Action == Create || c.Action == Update || c.Action == Conflict {
+				if err := scanSkill(&c, sk, opts); err != nil {
+					return err
+				}
+			}
 			dir, ent := sd.Dir, entry
 			prepare := want.Prepare
 			c.run = func() error {
@@ -149,6 +157,48 @@ func (p *Plan) skillDir(sc Scope, sd SkillDir, opts Options) error {
 	}
 	return nil
 }
+
+// scanSkill looks for hidden Unicode in a skill about to be placed. Critical
+// characters block it (unless --allow-hidden-unicode); the rest are warnings.
+func scanSkill(c *Change, sk skills.Skill, opts Options) error {
+	if sk.Dir == "" || !exists(sk.Dir) {
+		return nil // prepared on apply (replicate); scanned by audit
+	}
+	found, err := skills.Scan(sk.Dir)
+	if err != nil {
+		return fmt.Errorf("%s: %w", sk.Dir, err)
+	}
+	if len(found) == 0 {
+		return nil
+	}
+	var crit, warn []skills.Finding
+	for _, f := range found {
+		if f.Severity == skills.Critical {
+			crit = append(crit, f)
+		} else {
+			warn = append(warn, f)
+		}
+	}
+	if len(warn) > 0 {
+		c.Warnings = append(c.Warnings, "invisible characters: "+skills.Describe(warn))
+	}
+	if len(crit) == 0 {
+		return nil
+	}
+	reason := "hidden Unicode that can hijack an agent: " + skills.Describe(crit)
+	if opts.AllowHiddenUnicode {
+		c.Warnings = append(c.Warnings, reason+" (allowed with --allow-hidden-unicode)")
+		return nil
+	}
+	if c.Action != Conflict {
+		c.Forced = c.Action
+	}
+	c.Action, c.do, c.Reason = Conflict, "", reason+" (review it; --allow-hidden-unicode installs it)"
+	c.Unicode = true
+	return nil
+}
+
+func exists(p string) bool { _, err := os.Stat(p); return err == nil }
 
 func resolve(a, forced Action, force bool) Action {
 	if a != Conflict {

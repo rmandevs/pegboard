@@ -80,8 +80,20 @@ func (r *Resolver) local(src Source) ([]Skill, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", src.Raw, err)
 	}
+	// A skill inside an included remote stack is already a pinned copy:
+	// it goes to the cache by hash like a git skill, so a new version of
+	// the stack only relinks the skills whose content changed.
+	inStacks := strings.HasPrefix(dir, filepath.Join(r.Cache, "stacks")+string(filepath.Separator))
 	var out []Skill
 	for _, name := range sortedNames(found) {
+		if inStacks {
+			sk, err := r.store(name, src.Raw, found[name])
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, sk)
+			continue
+		}
 		h, err := Hash(found[name])
 		if err != nil {
 			return nil, err
@@ -368,8 +380,9 @@ const LockFile = "pegboard.lock"
 
 // Lock pins the commit and hash of each resolved skill.
 type Lock struct {
-	Version int                     `json:"version"`
-	Sources map[string]LockedSource `json:"skills"`
+	Version  int                      `json:"version"`
+	Includes map[string]LockedInclude `json:"includes,omitempty"`
+	Sources  map[string]LockedSource  `json:"skills"`
 
 	path    string
 	changed bool
@@ -383,7 +396,7 @@ type LockedSource struct {
 
 // LoadLock reads the lock; if it does not exist it returns an empty one.
 func LoadLock(path string) (*Lock, error) {
-	l := &Lock{Version: 1, Sources: map[string]LockedSource{}, path: path}
+	l := &Lock{Version: 1, Sources: map[string]LockedSource{}, Includes: map[string]LockedInclude{}, path: path}
 	data, err := os.ReadFile(path)
 	if errors.Is(err, fs.ErrNotExist) {
 		return l, nil
@@ -400,6 +413,9 @@ func LoadLock(path string) (*Lock, error) {
 	if l.Sources == nil {
 		l.Sources = map[string]LockedSource{}
 	}
+	if l.Includes == nil {
+		l.Includes = map[string]LockedInclude{}
+	}
 	l.path = path
 	return l, nil
 }
@@ -411,6 +427,48 @@ func (l *Lock) set(source string, ls LockedSource) {
 	}
 	l.Sources[source] = ls
 	l.changed = true
+}
+
+func (l *Lock) setInclude(raw string, li LockedInclude) {
+	l.Includes[raw] = li
+	l.changed = true
+}
+
+// Approved returns the fingerprint the lock recorded for an MCP from an
+// included stack.
+func (l *Lock) Approved(include, name string) (string, bool) {
+	if l == nil {
+		return "", false
+	}
+	fp, ok := l.Includes[include].MCPs[name]
+	return fp, ok
+}
+
+// Approve records the MCPs approved from each included stack (include →
+// name → fingerprint), replacing what was there.
+func (l *Lock) Approve(byInclude map[string]map[string]string) {
+	for raw, li := range l.Includes {
+		want := byInclude[raw]
+		if len(want) == 0 {
+			want = nil
+		}
+		if equalMaps(li.MCPs, want) {
+			continue
+		}
+		li.MCPs = want
+		l.Includes[raw] = li
+		l.changed = true
+	}
+}
+
+// PruneIncludes removes included stacks that are no longer declared.
+func (l *Lock) PruneIncludes(keep map[string]bool) {
+	for s := range l.Includes {
+		if !keep[s] {
+			delete(l.Includes, s)
+			l.changed = true
+		}
+	}
 }
 
 // Prune removes sources that are no longer declared.

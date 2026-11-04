@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 
@@ -215,12 +216,21 @@ func newUpdateCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 			var pending []*skills.Lock
 			changes := 0
 			for _, c := range ctxs {
-				if c.stack == nil || len(c.stack.Skills) == 0 {
+				if c.stack == nil {
 					continue
 				}
 				r := c.skillResolver(c.lock)
 				r.Update = true
-				for _, src := range c.stack.SkillSources() {
+				sources := c.stack.SkillSources()
+				if len(c.stack.Include) > 0 && len(args) == 0 {
+					n, merged, err := updateIncludes(out, c, r)
+					if err != nil {
+						return err
+					}
+					changes += n
+					sources = merged.SkillSources()
+				}
+				for _, src := range sources {
 					if !matchesAny(src, args) {
 						continue
 					}
@@ -266,7 +276,7 @@ func newUpdateCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 						return err
 					}
 				}
-				fmt.Fprintln(out, "Skills are already up to date.")
+				fmt.Fprintln(out, "Skills and includes are already up to date.")
 				return nil
 			}
 			if !yes && !confirm(cmd.InOrStdin(), out) {
@@ -284,6 +294,75 @@ func newUpdateCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 	}
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "do not ask for confirmation")
 	return cmd
+}
+
+// updateIncludes re-resolves the remote includes and prints what changed:
+// their content and, above all, the MCPs they bring (third-party code).
+func updateIncludes(out io.Writer, c *scopeCtx, r *skills.Resolver) (int, *stack.Resolved, error) {
+	before := map[string]skills.LockedInclude{}
+	for k, v := range c.lock.Includes {
+		before[k] = v
+	}
+	old, err := c.resolve()
+	if err != nil {
+		return 0, nil, err
+	}
+	fresh, err := c.stack.Resolve(func(in skills.Include, base string) (skills.Fetched, error) {
+		return r.FetchInclude(in, base)
+	})
+	if err != nil {
+		return 0, nil, err
+	}
+	changes := 0
+	for _, in := range fresh.Includes {
+		if !in.Remote || in.Hash == "" {
+			continue
+		}
+		prev, had := before[in.Raw]
+		switch {
+		case !had || prev.Hash == "":
+			fmt.Fprintf(out, "+ include %s %s\n", in.Raw, engine.Short(in.Hash))
+		case prev.Hash != in.Hash:
+			fmt.Fprintf(out, "~ include %s %s → %s\n", in.Raw, engine.Short(prev.Hash), engine.Short(in.Hash))
+		default:
+			continue
+		}
+		changes++
+	}
+	for _, name := range sortedKeys(fresh.MCPs) {
+		o := fresh.MCPOrigin[name]
+		if !o.Remote {
+			continue
+		}
+		m := fresh.MCPs[name]
+		prev, had := old.MCPs[name]
+		switch {
+		case !had:
+			fmt.Fprintf(out, "+ mcp %s %s (via %s)\n", name, m.Summary(), o.Via)
+		case stack.Fingerprint(prev) != stack.Fingerprint(m):
+			fmt.Fprintf(out, "~ mcp %s %s → %s (via %s)\n", name, prev.Summary(), m.Summary(), o.Via)
+		default:
+			continue
+		}
+		changes++
+	}
+	for _, name := range sortedKeys(old.MCPs) {
+		if _, ok := fresh.MCPs[name]; !ok && old.MCPOrigin[name].Remote {
+			fmt.Fprintf(out, "- mcp %s (via %s)\n", name, old.MCPOrigin[name].Via)
+			changes++
+		}
+	}
+	c.merged = fresh
+	return changes, fresh, nil
+}
+
+func sortedKeys[V any](m map[string]V) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func matchesAny(source string, args []string) bool {

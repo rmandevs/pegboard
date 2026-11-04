@@ -33,6 +33,11 @@ const (
 type Want struct {
 	MCP    mcp.MCP
 	Origin state.Origin
+	// Via is the included stack the MCP comes from ("" = the stack itself).
+	Via string
+	// Review, if set, explains why the MCP needs --approve: it comes from
+	// a remote included stack and the lock has not recorded it as is.
+	Review string
 }
 
 // Target is what the plan knows about a target: its provider, its scope, and
@@ -70,6 +75,16 @@ type Change struct {
 	Warnings []string
 	// Forced: a conflict that --force turns into this action.
 	Forced Action
+	// Unicode: blocked because of hidden characters; --force does not
+	// override it, only --allow-hidden-unicode does.
+	Unicode bool
+	// Review: an MCP from an included stack, new or changed since the lock
+	// recorded it; only --approve lets it through.
+	Review bool
+	// Via is the included stack a resource comes from; Command, what an
+	// included MCP runs (third-party code).
+	Via     string
+	Command string
 
 	// Detail completes the line when there is no Reason (for example,
 	// where a skill points). Link is the local directory it points to, if
@@ -109,6 +124,12 @@ type openDoc struct {
 type Options struct {
 	// Force turns conflicts into their underlying action.
 	Force bool
+	// AllowHiddenUnicode installs skills even if they carry critical hidden
+	// characters (bidirectional overrides, Unicode tags).
+	AllowHiddenUnicode bool
+	// Approve accepts MCPs from included stacks that are new or changed
+	// since the lock recorded them.
+	Approve bool
 }
 
 // Compute builds the plan. It writes nothing.
@@ -176,6 +197,10 @@ func (p *Plan) target(sc Scope, t Target, opts Options) error {
 		var obj *native.Obj
 		if want != nil {
 			c.Origin = want.Origin
+			c.Via = want.Via
+			if want.Via != "" {
+				c.Command = want.MCP.Summary()
+			}
 			enc := &agent.Encoder{Resolver: sc.Resolver}
 			obj, err = t.Provider.EncodeMCP(want.MCP, enc)
 			if err != nil {
@@ -231,6 +256,14 @@ func (p *Plan) target(sc Scope, t Target, opts Options) error {
 			c.do = ""
 			if opts.Force {
 				c.do = c.Forced
+			}
+		}
+		if want != nil && want.Review != "" && (c.Action == Create || c.Action == Update) {
+			if opts.Approve {
+				c.Warnings = append(c.Warnings, want.Review+" (approved with --approve)")
+			} else {
+				c.Forced, c.Action, c.do, c.Review = c.Action, Conflict, "", true
+				c.Reason = want.Review + "; review the command, then run with --approve"
 			}
 		}
 		var editErr error

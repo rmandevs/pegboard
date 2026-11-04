@@ -38,7 +38,8 @@ type Stack struct {
 		Skills []string `yaml:"skills"`
 	} `yaml:"remove"`
 	Policy struct {
-		AllowMCPs []string `yaml:"allow_mcps"`
+		AllowMCPs         []string `yaml:"allow_mcps"`
+		AllowSkillSources []string `yaml:"allow_skill_sources"`
 	} `yaml:"policy"`
 
 	Path string `yaml:"-"`
@@ -107,6 +108,11 @@ func Load(path string) (*Stack, error) {
 			return nil, fmt.Errorf("%s: skills: %w", path, err)
 		}
 	}
+	for _, in := range s.Include {
+		if _, err := skills.ParseInclude(in); err != nil {
+			return nil, fmt.Errorf("%s: include: %w", path, err)
+		}
+	}
 	for _, name := range s.MCPNames() {
 		m := s.MCPs[name]
 		if err := m.Validate(); err != nil {
@@ -140,35 +146,6 @@ func (s *Stack) MCPNames() []string {
 	}
 	sort.Strings(out)
 	return out
-}
-
-// Desired is the set of MCPs left after remove, validated against the
-// policy. Warnings cover what this phase still ignores.
-func (s *Stack) Desired() (map[string]mcp.MCP, []string, error) {
-	var warnings []string
-	if len(s.Include) > 0 {
-		warnings = append(warnings, s.Path+": include arrives in phase 3; ignoring it")
-	}
-	out := map[string]mcp.MCP{}
-	for n, m := range s.MCPs {
-		out[n] = m
-	}
-	for _, n := range s.Remove.MCPs {
-		delete(out, n)
-	}
-	if allow := s.Policy.AllowMCPs; len(allow) > 0 {
-		var denied []string
-		for n := range out {
-			if !contains(allow, n) {
-				denied = append(denied, n)
-			}
-		}
-		if len(denied) > 0 {
-			sort.Strings(denied)
-			return nil, warnings, fmt.Errorf("%s: policy.allow_mcps does not allow: %s", s.Path, strings.Join(denied, ", "))
-		}
-	}
-	return out, warnings, nil
 }
 
 func contains(l []string, s string) bool {
