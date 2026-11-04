@@ -13,7 +13,8 @@
 //	./path, ../path, /path, ~/path local skill (linked as-is)
 //	pegboard                       pegboard's own skill
 //
-// Git sources accept ?ref=<branch|tag|commit> at the end.
+// Git sources accept ?ref=<branch|tag|commit> at the end. APM's shorthand
+// also works: owner/repo/sub/path#ref and host/owner/repo/sub/path#ref.
 package skills
 
 import (
@@ -76,6 +77,16 @@ func Parse(raw string) (Source, error) {
 			return s, fmt.Errorf("%s: empty ?ref=", raw)
 		}
 	}
+	// APM-style #ref (owner/repo#v1.0.0).
+	if i := strings.LastIndex(rest, "#"); i >= 0 && !strings.Contains(rest[i:], "/") {
+		if s.Ref != "" {
+			return s, fmt.Errorf("%s: use either #ref or ?ref=, not both", raw)
+		}
+		s.Ref, rest = rest[i+1:], rest[:i]
+		if s.Ref == "" {
+			return s, fmt.Errorf("%s: empty #ref", raw)
+		}
+	}
 	if m := treeRe.FindStringSubmatch(rest); m != nil {
 		if s.Ref != "" {
 			return s, fmt.Errorf("%s: the ref is already in the /tree/ URL", raw)
@@ -107,10 +118,43 @@ func Parse(raw string) (Source, error) {
 	case hostRe.MatchString(rest):
 		m := hostRe.FindStringSubmatch(rest)
 		s.URL = "https://" + m[1] + "/" + m[2] + "/" + m[3] + ".git"
+	case s.Path == "" && apmSubdir(rest) != nil:
+		// APM shorthand with a subdirectory: owner/repo/a/b or
+		// host.tld/owner/repo/a/b.
+		seg := apmSubdir(rest)
+		if strings.Contains(seg[0], ".") {
+			s.URL = "https://" + seg[0] + "/" + seg[1] + "/" + strings.TrimSuffix(seg[2], ".git") + ".git"
+			s.Path = strings.Join(seg[3:], "/")
+		} else {
+			s.URL = GitHub + seg[0] + "/" + strings.TrimSuffix(seg[1], ".git") + ".git"
+			s.Path = strings.Join(seg[2:], "/")
+		}
 	default:
 		return s, fmt.Errorf("unrecognized skill source %q (see `pegboard install --help`)", raw)
 	}
 	return s, nil
+}
+
+// apmSubdir splits owner/repo/path… (or host/owner/repo/path…) into
+// segments; nil if it is not that shape.
+func apmSubdir(s string) []string {
+	if strings.Contains(s, "@") || strings.Contains(s, ":") {
+		return nil
+	}
+	seg := strings.Split(strings.Trim(s, "/"), "/")
+	need := 3
+	if strings.Contains(seg[0], ".") {
+		need = 4
+	}
+	if len(seg) < need {
+		return nil
+	}
+	for _, x := range seg {
+		if x == "" || x == "." || x == ".." || !nameRe.MatchString(x) {
+			return nil
+		}
+	}
+	return seg
 }
 
 // FileURL is the file:// URL of a local directory (file:///C:/… on Windows).

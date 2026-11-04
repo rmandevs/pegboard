@@ -1,6 +1,8 @@
 package skills
 
 import (
+	"archive/zip"
+	"bytes"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -26,6 +28,12 @@ func TestParse(t *testing.T) {
 		{"./skills/mine", Local, "", "", "", ""},
 		{"~/skills/mine", Local, "", "", "", ""},
 		{"pegboard", Builtin, "", "", "", ""},
+		// APM shorthand.
+		{"microsoft/apm-sample-package#v1.0.0", Git, GitHub + "microsoft/apm-sample-package.git", "", "v1.0.0", ""},
+		{"anthropics/skills/skills/frontend-design", Git, GitHub + "anthropics/skills.git", "skills/frontend-design", "", ""},
+		{"ComposioHQ/awesome-claude-skills/brand-guidelines#main", Git, GitHub + "ComposioHQ/awesome-claude-skills.git", "brand-guidelines", "main", ""},
+		{"gitlab.com/acme/standards/skills/x#v2", Git, "https://gitlab.com/acme/standards.git", "skills/x", "v2", ""},
+		{"bitbucket.org/team/repo#main", Git, "https://bitbucket.org/team/repo.git", "", "main", ""},
 	}
 	for _, c := range cases {
 		s, err := Parse(c.in)
@@ -37,7 +45,7 @@ func TestParse(t *testing.T) {
 			t.Errorf("%s: %+v", c.in, s)
 		}
 	}
-	for _, bad := range []string{"", "alone", "o/r@bad name", "o/r?ref=", "https://github.com/o/r/tree/main?ref=x"} {
+	for _, bad := range []string{"", "alone", "o/r@bad name", "o/r?ref=", "https://github.com/o/r/tree/main?ref=x", "o/r#", "o/r#a?ref=b", "o/r/../x"} {
 		if _, err := Parse(bad); err == nil {
 			t.Errorf("%q should fail", bad)
 		}
@@ -235,5 +243,34 @@ func TestResolveLocalAndBuiltin(t *testing.T) {
 	got, err = r.Resolve(b)
 	if err != nil || len(got) != 1 || got[0].Name != "pegboard" || got[0].Local {
 		t.Fatalf("%+v %v", got, err)
+	}
+}
+
+func TestUnzipRejectsEscapes(t *testing.T) {
+	for _, name := range []string{"../evil", "a/../../evil", "/etc/evil", "..\\evil", "C:/evil", "a/..", "ok/../../x"} {
+		var buf bytes.Buffer
+		zw := zip.NewWriter(&buf)
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = w.Write([]byte("x"))
+		_ = zw.Close()
+		dst := t.TempDir()
+		if err := Unzip(buf.Bytes(), filepath.Join(dst, "out")); err == nil || !strings.Contains(err.Error(), "escapes") {
+			t.Errorf("%q: err = %v", name, err)
+		}
+	}
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	w, _ := zw.Create("stack/pegboard.yaml")
+	_, _ = w.Write([]byte("version: 1\n"))
+	_ = zw.Close()
+	dst := filepath.Join(t.TempDir(), "out")
+	if err := Unzip(buf.Bytes(), dst); err != nil {
+		t.Fatal(err)
+	}
+	if root, err := zipRoot(dst); err != nil || filepath.Base(root) != "stack" {
+		t.Fatalf("root %q, %v", root, err)
 	}
 }

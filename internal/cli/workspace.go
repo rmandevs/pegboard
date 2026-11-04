@@ -25,6 +25,25 @@ type scopeCtx struct {
 	targets []agent.Target // detected and filtered by --agent
 	env     agent.Env
 	lock    *skills.Lock // nil if there is no stack
+	merged  *stack.Resolved
+}
+
+// resolve merges the stack with its includes (once per command).
+func (c *scopeCtx) resolve() (*stack.Resolved, error) {
+	if c.stack == nil {
+		return &stack.Resolved{}, nil
+	}
+	if c.merged == nil {
+		r := c.skillResolver(c.lock)
+		res, err := c.stack.Resolve(func(in skills.Include, base string) (skills.Fetched, error) {
+			return r.FetchInclude(in, base)
+		})
+		if err != nil {
+			return nil, err
+		}
+		c.merged = res
+	}
+	return c.merged, nil
 }
 
 func statePath(env agent.Env, scope agent.Scope) string {
@@ -103,6 +122,12 @@ func (c *scopeCtx) skillResolver(lock *skills.Lock) *skills.Resolver {
 // resolveSkills resolves a list of sources; two skills with the same name
 // are an error.
 func resolveSkills(r *skills.Resolver, sources []string) ([]skills.Skill, error) {
+	return resolveSkillsExcept(r, sources, nil)
+}
+
+// resolveSkillsExcept is resolveSkills leaving out what removed says, before
+// checking duplicate names (SPEC §3.5: remove can settle a clash).
+func resolveSkillsExcept(r *skills.Resolver, sources []string, removed func(source, name string) bool) ([]skills.Skill, error) {
 	var out []skills.Skill
 	from := map[string]string{}
 	for _, raw := range sources {
@@ -115,6 +140,9 @@ func resolveSkills(r *skills.Resolver, sources []string) ([]skills.Skill, error)
 			return nil, err
 		}
 		for _, sk := range got {
+			if removed != nil && removed(raw, sk.Name) {
+				continue
+			}
 			if prev, dup := from[sk.Name]; dup {
 				return nil, fmt.Errorf("skill %q comes from two sources: %s and %s", sk.Name, prev, raw)
 			}
@@ -234,30 +262,35 @@ func (c *scopeCtx) declarative(pruneAdhoc bool) (engine.Scope, []string, func() 
 		return engScope, warnings, nil, err
 	}
 	var listed []string
-	var declared []string
 	agentsMD := false
+	res, err := c.resolve()
+	if err != nil {
+		return engScope, warnings, nil, err
+	}
+	declared := res.SkillSources()
 	if c.stack != nil {
 		listed = c.stack.Agents
-		declared = c.stack.SkillSources()
 		agentsMD = c.stack.Context.AgentsMD
 	}
 	selected := func(t agent.Target) bool { return mcp.Matches(listed, t.Agent, t.ID()) }
 	lock := c.lock
-	resolved, err := resolveSkills(c.skillResolver(lock), declared)
+	bySource := map[string]stack.ResolvedSkill{}
+	for _, rs := range res.Skills {
+		bySource[rs.Ref.Source] = rs
+	}
+	resolved, err := resolveSkillsExcept(c.skillResolver(lock), declared, func(source, name string) bool {
+		return bySource[source].Removed(name)
+	})
 	if err != nil {
 		return engScope, warnings, nil, err
 	}
 	limits := map[string][]string{}
-	if c.stack != nil {
-		for _, r := range c.stack.Skills {
-			limits[r.Source] = r.Agents
-		}
+	for _, rs := range res.Skills {
+		limits[rs.Ref.Source] = rs.Ref.Agents
 	}
 	wants := map[string]*engine.SkillWant{}
 	for _, sk := range resolved {
-		if !c.stack.Removed(sk.Source, sk.Name) {
-			wants[sk.Name] = &engine.SkillWant{Skill: sk, Origin: state.Declared}
-		}
+		wants[sk.Name] = &engine.SkillWant{Skill: sk, Origin: state.Declared, Via: bySource[sk.Source].Via}
 	}
 	engScope.Skills = c.skillDirs(func(t agent.Target) map[string]*engine.SkillWant {
 		if !selected(t) {
@@ -297,6 +330,23 @@ func (c *scopeCtx) declarative(pruneAdhoc bool) (engine.Scope, []string, func() 
 			keep[s] = true
 		}
 		lock.Prune(keep)
+		includes := map[string]bool{}
+		for _, in := range res.Includes {
+			if in.Remote && in.Hash != "" {
+				includes[in.Raw] = true
+			}
+		}
+		lock.PruneIncludes(includes)
+		approved := map[string]map[string]string{}
+		for name, o := range res.MCPOrigin {
+			if o.Remote {
+				if approved[o.Via] == nil {
+					approved[o.Via] = map[string]string{}
+				}
+				approved[o.Via][name] = stack.Fingerprint(res.MCPs[name])
+			}
+		}
+		lock.Approve(approved)
 		return lock.Save()
 	}
 	return engScope, warnings, after, nil
@@ -307,13 +357,15 @@ func (c *scopeCtx) declarativeMCPs(pruneAdhoc bool) (engine.Scope, []string, err
 	engScope := engine.Scope{Scope: c.scope, State: c.state, Resolver: c.resolver()}
 	var warnings []string
 	desired := map[string]mcp.MCP{}
+	origins := map[string]stack.Origin{}
 	var listed []string
 	if c.stack != nil {
-		var err error
-		desired, warnings, err = c.stack.Desired()
+		res, err := c.resolve()
 		if err != nil {
 			return engScope, warnings, err
 		}
+		desired, origins = res.MCPs, res.MCPOrigin
+		warnings = append(warnings, res.Warnings...)
 		listed = c.stack.Agents
 		for _, a := range listed {
 			found := false
@@ -337,7 +389,11 @@ func (c *scopeCtx) declarativeMCPs(pruneAdhoc bool) (engine.Scope, []string, err
 		if selected {
 			for name, m := range desired {
 				if m.AppliesTo(t.Agent, t.ID()) {
-					wants[name] = &engine.Want{MCP: m, Origin: state.Declared}
+					w := &engine.Want{MCP: m, Origin: state.Declared, Via: origins[name].Via}
+					if origins[name].Remote {
+						w.Review = stack.Review(c.lock, w.Via, name, m)
+					}
+					wants[name] = w
 				}
 			}
 		}

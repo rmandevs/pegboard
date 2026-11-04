@@ -116,6 +116,7 @@ the flag, replicate asks, unless it runs with -y, --json, or --dry-run.`,
 	cmd.Flags().BoolVar(&f.dryRun, "dry-run", false, "show the plan and write nothing")
 	cmd.Flags().BoolVarP(&f.yes, "yes", "y", false, "do not ask for confirmation")
 	cmd.Flags().BoolVar(&f.force, "force", false, "overwrite anything that already exists")
+	f.safetyFlags(cmd, false)
 	return cmd
 }
 

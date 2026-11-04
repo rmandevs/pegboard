@@ -2,6 +2,8 @@ package cli
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -9,6 +11,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/rmandevs/pegboard/internal/agent"
+	"github.com/rmandevs/pegboard/internal/apm"
+	"github.com/rmandevs/pegboard/internal/engine"
 	"github.com/rmandevs/pegboard/internal/mcp"
 	"github.com/rmandevs/pegboard/internal/native"
 	"github.com/rmandevs/pegboard/internal/secrets"
@@ -26,17 +30,26 @@ type found struct {
 }
 
 func newImportCmd(opts *options, newEnv EnvFunc) *cobra.Command {
-	return &cobra.Command{
+	var from string
+	cmd := &cobra.Command{
 		Use:   "import",
-		Short: "Adopt the MCPs already configured by agents into pegboard.yaml",
+		Short: "Adopt the MCPs already configured by agents (or an apm.yml) into pegboard.yaml",
 		Long: `Read each agent's config, add the MCPs pegboard does not manage yet to
 pegboard.yaml, and record them in state. Plain-text secrets (env and headers)
-are replaced with ${env:…} references: export those variables before apply.`,
+are replaced with ${env:…} references: export those variables before apply.
+
+With --from apm.yml, read a Microsoft APM manifest instead: its skill
+packages and self-defined MCP servers (registry: false) go into
+pegboard.yaml. Registry and marketplace entries, prompts, instructions, and
+hooks stay with apm; the output lists what was skipped and why.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			env, err := newEnv(opts.dir)
 			if err != nil {
 				return err
+			}
+			if from != "" {
+				return importAPM(cmd, opts, env, from)
 			}
 			scopes, provs, err := opts.selection()
 			if err != nil {
@@ -63,6 +76,91 @@ are replaced with ${env:…} references: export those variables before apply.`,
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&from, "from", "", "read an APM manifest (apm.yml) instead of the agents")
+	return cmd
+}
+
+// importAPM translates an apm.yml into the scope's pegboard.yaml.
+func importAPM(cmd *cobra.Command, opts *options, env agent.Env, from string) error {
+	path := from
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(env.ProjectDir, path)
+	}
+	if info, err := os.Stat(path); err == nil && info.IsDir() {
+		path = filepath.Join(path, apm.FileName)
+	}
+	ed, err := opts.editor(env)
+	if err != nil {
+		return err
+	}
+	base := filepath.Dir(ed.Path())
+	res, err := apm.Read(path, func(abs string) string {
+		rel, err := filepath.Rel(base, abs)
+		if err != nil {
+			return abs
+		}
+		rel = filepath.ToSlash(rel)
+		if !strings.HasPrefix(rel, "../") {
+			rel = "./" + rel
+		}
+		return rel
+	})
+	if err != nil {
+		return err
+	}
+	r := editResult{File: ed.Path()}
+	var skipped []string
+	for _, name := range sortedKeys(res.MCPs) {
+		if ed.HasMCP(name) {
+			skipped = append(skipped, "mcp "+name+": already in "+stack.FileName)
+			continue
+		}
+		if err := ed.Set(name, res.MCPs[name]); err != nil {
+			return err
+		}
+		r.Added = append(r.Added, "mcp "+name)
+	}
+	for _, sk := range res.Skills {
+		added, err := ed.AddSkill(sk.Source, nil)
+		if err != nil {
+			return err
+		}
+		if added {
+			r.Added = append(r.Added, "skill "+sk.Source)
+		}
+	}
+	if len(r.Added) > 0 {
+		if err := ed.Save(); err != nil {
+			return err
+		}
+	}
+	skipped = append(skipped, res.Skipped...)
+	if opts.json {
+		return engine.WriteJSON(cmd.OutOrStdout(), struct {
+			editResult
+			Skipped  []string `json:"skipped"`
+			Warnings []string `json:"warnings"`
+		}{r, nonNil(skipped), nonNil(res.Warnings)})
+	}
+	errOut := cmd.ErrOrStderr()
+	for _, w := range res.Warnings {
+		fmt.Fprintln(errOut, "warning:", w)
+	}
+	for _, s := range skipped {
+		fmt.Fprintln(errOut, "skipped:", s)
+	}
+	if len(r.Added) == 0 {
+		fmt.Fprintf(cmd.OutOrStdout(), "Nothing to import from %s.\n", env.Pretty(path))
+		return nil
+	}
+	return writeEdit(cmd, opts, env, r)
+}
+
+func nonNil(l []string) []string {
+	if l == nil {
+		return []string{}
+	}
+	return l
 }
 
 // importScope moves the scope's targets' MCPs into pegboard.yaml. With

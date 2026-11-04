@@ -66,6 +66,7 @@ func TestRoundTrip(t *testing.T) {
 		"openclaw": {"stdio": true, "http": true},
 		"cursor":   {"stdio": true, "http": true},
 		"gemini":   {"stdio": true, "http": true},
+		"copilot":  {"stdio": true, "http": true},
 	}
 	for _, p := range All() {
 		mp := p.(agent.MCPProvider)

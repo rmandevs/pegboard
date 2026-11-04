@@ -18,7 +18,7 @@ archives:
     format_overrides:
       - goos: windows
         formats: [zip]
-    files: [README.md, SPEC.md, LICENSE*]
+    files: [README.md, SPEC.md, CHANGELOG.md, LICENSE*]
 
 checksum:
   name_template: checksums.txt

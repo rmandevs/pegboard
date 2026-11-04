@@ -43,6 +43,9 @@ func (p *Plan) WriteText(w io.Writer, pretty Pretty) {
 		case c.Link != "":
 			detail = "(" + pretty(c.File) + " → " + pretty(c.Link) + ")"
 		}
+		if c.Command != "" && c.Reason == "" {
+			detail += " " + c.Command
+		}
 		if c.Reason != "" {
 			detail = c.Reason
 		}
@@ -56,6 +59,13 @@ func (p *Plan) WriteText(w io.Writer, pretty Pretty) {
 			detail += " [ad-hoc]"
 		}
 		fmt.Fprintf(w, "  %s %-*s  %s\n", symbols[c.Action], width, c.Kind+" "+c.Name, detail)
+		if c.Via != "" {
+			pad := ""
+			if c.Reason != "" && c.Command != "" {
+				pad = c.Command + "  "
+			}
+			fmt.Fprintf(w, "    %-*s  %svia %s\n", width, "", pad, c.Via)
+		}
 		for _, warn := range c.Warnings {
 			fmt.Fprintf(w, "      ⚠ %s\n", warn)
 		}
@@ -87,6 +97,8 @@ type changeJSON struct {
 	File     string   `json:"file"`
 	Reason   string   `json:"reason,omitempty"`
 	Detail   string   `json:"detail,omitempty"`
+	Via      string   `json:"via,omitempty"`
+	Command  string   `json:"command,omitempty"`
 	Warnings []string `json:"warnings"`
 }
 
@@ -120,7 +132,7 @@ func (p *Plan) JSON(warnings []string) PlanJSON {
 		cj := changeJSON{
 			Scope: string(c.Scope), Target: c.Target, Kind: c.Kind, Name: c.Name, Action: c.Action,
 			Forced: c.Forced, Origin: string(c.Origin), File: c.File, Reason: c.Reason, Detail: c.Detail,
-			Warnings: c.Warnings,
+			Via: c.Via, Command: c.Command, Warnings: c.Warnings,
 		}
 		if cj.Warnings == nil {
 			cj.Warnings = []string{}

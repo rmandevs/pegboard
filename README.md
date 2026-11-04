@@ -115,6 +115,7 @@ Continue with the [quick start](https://usepegboard.dev/docs/quick-start/) or th
 | OpenClaw | yes (`mcp.servers`) | yes | workspace `AGENTS.md` (`replicate --context`) |
 | Cursor | yes | yes | project `AGENTS.md` |
 | Gemini CLI | yes | yes | `GEMINI.md` (`replicate --context`) |
+| GitHub Copilot CLI | yes (global) | yes | project `AGENTS.md` |
 
 ## What it does
 
@@ -128,11 +129,35 @@ Continue with the [quick start](https://usepegboard.dev/docs/quick-start/) or th
   pegboard install skill vercel-labs/agent-skills@web-design-guidelines
   ```
 
+- **Shares stacks.** `include` pulls other stacks from a folder, a git repo, or a zip, pinned in `pegboard.lock`. An MCP that a remote stack brings is shown with its full command and source, and only goes in with `--approve`. Approval is recorded in the lock, so a team reviews it once, in a pull request.
+
+  ```yaml
+  include:
+    - acme/agent-stack//web?ref=v3
+  policy:
+    allow_mcps: [github, linear]   # an included stack can tighten this, never relax it
+  ```
+
+- **Blocks hidden instructions.** Skills with invisible Unicode (bidirectional overrides, Unicode tags) are stopped in the plan, and `pegboard audit` scans every skill and context file your agents read.
+- **Fits CI.** `drift`, `plan`, and `audit` take `--exit-code`, and the repo is a GitHub Action:
+
+  ```yaml
+  - uses: rmandevs/pegboard@v0.2.0
+    with:
+      command: drift   # or plan, or audit
+  ```
+
+- **Exports an SBOM.** `pegboard lock export --format cyclonedx` (or `spdx`) lists every pinned skill and stack with its commit and hash.
+- **Reads APM manifests.** `pegboard import --from apm.yml` brings the skills and self-defined MCPs of a [Microsoft APM](https://github.com/microsoft/apm) manifest into `pegboard.yaml`, and sources like `owner/repo/path#v1` work as written.
 - **Teaches your agents to use it.** `pegboard skill install` gives them a skill for working with Pegboard.
+
+## Pegboard and APM
+
+[APM](https://github.com/microsoft/apm) is a package manager: it resolves agent packages (instructions, prompts, agents, hooks, skills) for a project and compiles them. Pegboard reconciles: it reads what each agent already has, shows a plan against those live files, writes only what it owns, and detects drift. They work together. Keep `apm.yml` for packages, and use `pegboard import --from apm.yml` when you want plan, state, and drift across agents.
 
 ## Status
 
-Pegboard is an early MVP. It handles MCPs, skills, and context on the agents above. Remote stacks and a TUI are planned; see [SPEC.md](SPEC.md) for the design and phases.
+Pegboard is young. It handles MCPs, skills, context, and shared stacks on the agents above. `op://` and keychain secrets and a TUI are planned; see [SPEC.md](SPEC.md) for the design and phases, and [CHANGELOG.md](CHANGELOG.md) for what changed.
 
 ## Contributing
 

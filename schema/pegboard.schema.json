@@ -22,7 +22,7 @@
       "enum": ["global", "none"]
     },
     "include": {
-      "description": "Remote stacks merged in order, before this file.",
+      "description": "Stacks merged in order, before this file: ./local, owner/repo//path?ref=x, a git URL, or a .zip (local or https).",
       "type": "array",
       "items": { "type": "string", "minLength": 1 }
     },
@@ -75,7 +75,14 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "allow_mcps": { "type": "array", "items": { "$ref": "#/$defs/name" }, "uniqueItems": true }
+        "allow_mcps": {
+          "description": "Only these MCP names may be in the result. Included stacks add their own lists; none can relax another.",
+          "type": "array", "items": { "$ref": "#/$defs/name" }, "uniqueItems": true
+        },
+        "allow_skill_sources": {
+          "description": "Only skill sources matching these patterns may be in the result; * matches any text (acme/*, github.com/acme/*).",
+          "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true
+        }
       }
     }
   },

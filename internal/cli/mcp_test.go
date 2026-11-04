@@ -230,9 +230,6 @@ func TestPolicyAndPhases(t *testing.T) {
 	m.File("home/.config/pegboard/pegboard.yaml", globalStack+"policy:\n  allow_mcps: [github]\n")
 	out := mustRun(t, m, 1, "plan")
 	mustContain(t, "policy", out, "policy.allow_mcps does not allow: notion")
-	m.File("home/.config/pegboard/pegboard.yaml", "version: 1\ninclude: [github.com/x/y]\n")
-	out = mustRun(t, m, 0, "plan")
-	mustContain(t, "phase 3", out, "warning:", "include arrives in phase 3")
 	m.File("home/.config/pegboard/pegboard.yaml", "version: 1\nmcps:\n  x:\n    command: \"${op://v/i}\"\n")
 	mustContain(t, "phase 3", mustRun(t, m, 1, "plan"), "phase 3")
 }

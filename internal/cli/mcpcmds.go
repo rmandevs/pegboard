@@ -74,6 +74,16 @@ type applyFlags struct {
 	exitCode   bool
 	pruneAdhoc bool
 	dryRun     bool
+	approve    bool
+	allowUni   bool
+}
+
+// safetyFlags are the flags that let through what pegboard stops for review.
+func (f *applyFlags) safetyFlags(cmd *cobra.Command, includes bool) {
+	cmd.Flags().BoolVar(&f.allowUni, "allow-hidden-unicode", false, "install skills even if they carry hidden Unicode (bidi overrides, tags)")
+	if includes {
+		cmd.Flags().BoolVar(&f.approve, "approve", false, "accept MCPs from included stacks that are new or changed since pegboard.lock")
+	}
 }
 
 func newPlanCmd(opts *options, newEnv EnvFunc) *cobra.Command {
@@ -89,6 +99,7 @@ func newPlanCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 	cmd.Flags().BoolVar(&f.exitCode, "exit-code", false, "exit with 2 if there are changes")
 	cmd.Flags().BoolVar(&f.force, "force", false, "show the plan resolving conflicts in favor of pegboard.yaml")
 	cmd.Flags().BoolVar(&f.pruneAdhoc, "prune-adhoc", false, "also remove ad-hoc installed entries")
+	f.safetyFlags(cmd, true)
 	return cmd
 }
 
@@ -105,6 +116,7 @@ func newApplyCmd(opts *options, newEnv EnvFunc) *cobra.Command {
 	cmd.Flags().BoolVarP(&f.yes, "yes", "y", false, "do not ask for confirmation")
 	cmd.Flags().BoolVar(&f.force, "force", false, "overwrite content edited by hand")
 	cmd.Flags().BoolVar(&f.pruneAdhoc, "prune-adhoc", false, "also remove ad-hoc installed entries")
+	f.safetyFlags(cmd, true)
 	return cmd
 }
 
@@ -148,7 +160,7 @@ func execute(cmd *cobra.Command, opts *options, env agent.Env, scopes []engine.S
 	if apply && opts.json && !f.yes {
 		return errors.New("--json requires -y: there is no one to ask")
 	}
-	plan, err := engine.Compute(scopes, engine.Options{Force: f.force})
+	plan, err := engine.Compute(scopes, engine.Options{Force: f.force, Approve: f.approve, AllowHiddenUnicode: f.allowUni})
 	if err != nil {
 		return err
 	}
