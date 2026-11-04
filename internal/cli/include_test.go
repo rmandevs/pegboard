@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -46,7 +47,7 @@ remove:
 	}
 	mustRun(t, m, 0, "apply", "-y", "--agent", "claude-code")
 	mustContain(t, "claude.json", read(t, m, "home/.claude.json"), "https://mcp.linear.app/v2")
-	if l := linkOf(t, m, "home/.claude/skills/web"); !strings.HasSuffix(l, "stacks/web/skills/web") {
+	if l := linkOf(t, m, "home/.claude/skills/web"); !strings.HasSuffix(filepath.ToSlash(l), "stacks/web/skills/web") {
 		t.Errorf("skill link = %s", l)
 	}
 }
