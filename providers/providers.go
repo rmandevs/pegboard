@@ -7,6 +7,7 @@ import (
 	"github.com/rmandevs/pegboard/internal/agent"
 	"github.com/rmandevs/pegboard/providers/claudecode"
 	"github.com/rmandevs/pegboard/providers/codex"
+	"github.com/rmandevs/pegboard/providers/copilot"
 	"github.com/rmandevs/pegboard/providers/cursor"
 	"github.com/rmandevs/pegboard/providers/gemini"
 	"github.com/rmandevs/pegboard/providers/hermes"
@@ -28,6 +29,7 @@ func All() []agent.Provider {
 		openclaw.Provider{},
 		cursor.Provider{},
 		gemini.Provider{},
+		copilot.Provider{},
 	}
 }
 
@@ -75,4 +77,5 @@ var (
 	_ agent.MCPProvider = openclaw.Provider{}
 	_ agent.MCPProvider = cursor.Provider{}
 	_ agent.MCPProvider = gemini.Provider{}
+	_ agent.MCPProvider = copilot.Provider{}
 )

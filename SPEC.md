@@ -45,6 +45,7 @@ with a 3×3 grid of holes) stacked on two layers. It must read at 16 px.
 |---|---|
 | rulesync, ruler, vsync, sync-agents-settings | They are generators/copiers: they translate a source, but without `plan`, without state of what they created, without a lock, and without redistributable stacks |
 | add-mcp, `npx skills` | One-off installers for a single thing; there is no desired state |
+| Microsoft APM (`apm.yml`) | A package manager: it resolves and compiles agent packages (instructions, prompts, agents, hooks, skills) per project. It does not reconcile what an agent already has: no `plan` against the live files, no state of what it wrote, no `import`/`replicate` of an existing setup. They complement each other: `pegboard import --from apm.yml` reads its skills and self-defined MCPs (§4.3) |
 | Ansible / Chef with `template` | They work as transport, but you would have to write each agent's format and paths by hand, without merging with existing content or detecting drift |
 | Asking an agent to do it | Non-deterministic, burns tokens, leaves no record, and cannot be repeated |
 
@@ -105,7 +106,7 @@ version: 1
 agents: [claude-code, codex, opencode, hermes]   # targets; default: detected ones
 inherit: global                                  # global | none (project only)
 
-include:                                         # other stacks (phase 3, §3.5)
+include:                                         # other stacks (§3.5)
   - ./stacks/web
   - github.com/rmandevs/stacks//web?ref=v1
 
@@ -171,6 +172,7 @@ in the `plan` that the secret will remain in plain text in that file.
 | OpenClaw | `${X}` | plain text |
 | Cursor | `${env:X}` | plain text |
 | Gemini CLI | `${X}` | plain text |
+| Copilot CLI | `${X}` | plain text |
 
 State stores a hash of each entry with plain-text values masked: it detects
 manual edits without depending on the secret. Because `plan` compares what is
@@ -212,8 +214,7 @@ and drift detection.
 
 ### 3.5 `include`
 
-Status: designed for phase 3, not implemented. Until then, `include` is
-ignored with a warning.
+Status: implemented in v0.2.0 for local, git, and zip stacks.
 
 A stack packages MCPs and skills so they can be reproduced across agents,
 machines, and repos. Including one uses the same `pegboard.yaml` format, with
@@ -237,7 +238,7 @@ destination, is a symlink, or exceeds the size limit makes the whole zip fail.
 | `mcps`, `skills` | Merged into the stack that includes it. An MCP's `agents:` restriction is kept |
 | `include` | Resolved first, depth first. A cycle is an error, as is exceeding 10 levels |
 | `remove` | Applies only to what that stack itself includes, never to its siblings or to the stack that includes it |
-| `policy` | Accumulates and cannot be relaxed: every `allow_mcps` list is checked against the final result |
+| `policy` | Accumulates and cannot be relaxed: every `allow_mcps` and `allow_skill_sources` list in the tree is checked against the final result |
 | `agents`, `inherit`, `context` | Ignored with a warning. The root stack decides these |
 
 **Merge**
@@ -265,8 +266,26 @@ destination, is a symlink, or exceeds the size limit makes the whole zip fail.
   ```
   claude-code · project
     + mcp github   (.mcp.json) npx -y @modelcontextprotocol/server-github
-                   via github.com/acme/stacks//web@v1
+                   via github.com/acme/stacks//web?ref=v1
   ```
+
+**Consent for MCPs from remote stacks.** An MCP that a git or zip stack
+brings (directly or through its own includes) is a `!` conflict the first
+time it appears and whenever its command, URL, args, or variable names
+change:
+
+```
+claude-code · global
+  ! mcp github  new MCP from included stack acme/stacks//web; review the command, then run with --approve
+                npx -y @modelcontextprotocol/server-github  via acme/stacks//web
+```
+
+`apply --approve` accepts them, and `apply` records each one's fingerprint
+(command or URL, args, and the names, never the values, of env and headers)
+under `includes.<source>.mcps` in `pegboard.lock`. Because the lock is
+versioned, approval is reviewed once in a pull request and teammates who
+apply the same lock are not asked again. `--force` does not imply
+`--approve`. Local includes are the user's own files and need no approval.
 
 **Lock**
 
@@ -278,7 +297,10 @@ ignored; a stack that needs an exact version declares it with `?ref=<commit>`.
 {
   "version": 1,
   "includes": {
-    "github.com/acme/stacks//web?ref=v1": { "commit": "3f2a…", "hash": "sha256:91c4…" },
+    "github.com/acme/stacks//web?ref=v1": {
+      "commit": "3f2a…", "hash": "sha256:91c4…",
+      "mcps": { "github": "sha256:5d1e…" }
+    },
     "https://acme.dev/web.zip": { "hash": "sha256:7be0…" }
   },
   "skills": {}
@@ -314,10 +336,15 @@ pegboard uninstall …              # removes something installed ad-hoc
 pegboard agents                   # detected agents, paths, and provider version
 pegboard skill install            # installs pegboard's skill on agents (§7)
 pegboard skill uninstall          # uninstalls pegboard's skill from agents (§7)
+pegboard audit [--exit-code]      # hidden Unicode in skills and context (§4.4)
+pegboard lock export --format cyclonedx|spdx   # SBOM of pegboard.lock (§4.5)
+pegboard import --from apm.yml    # reads a Microsoft APM manifest (§4.3)
 ```
 
 Common flags: `--scope global|project`, `--agent <id>` (repeatable), `--json`
-(stable output for agents and scripts), `--dir <path>`.
+(stable output for agents and scripts), `--dir <path>`. Commands that write
+also take `--allow-hidden-unicode` (§4.4); `plan`/`apply` take `--approve`
+(§3.5).
 
 `plan` shows, per target, each resource as `+` create, `~` update, `-` remove,
 `=` adopt (it was already exactly like that; it is only recorded), or `!`
@@ -390,6 +417,64 @@ result later. `--dry-run` shows the plan without writing.
   then it leaves context alone and warns. Hermes is left out both ways, because
   `SOUL.md` is its persona rather than instructions for a project.
 
+### 4.3 Reading `apm.yml`
+
+`pegboard import --from apm.yml` translates what pegboard manages from a
+Microsoft APM manifest into the scope's `pegboard.yaml`:
+
+| `apm.yml` | `pegboard.yaml` |
+|---|---|
+| `owner/repo`, `owner/repo#ref`, `owner/repo/sub/path`, `host/owner/repo#ref` | the same source; pegboard also accepts APM's shorthand directly |
+| `{git, path, ref}` | `url//path?ref=ref` |
+| `{git, skills: [a, b]}` | `owner/repo@a`, `owner/repo@b` (GitHub shorthand only) |
+| `./local/path` | the path, relative to `pegboard.yaml` |
+| MCP with `registry: false` | an MCP; `${VAR}`, `${{ secrets.X }}` and `<X>` become `${env:X}` |
+
+Registry and marketplace entries, semver ranges, single prompt or agent
+files, and `${input:…}` are skipped with a reason: APM resolves those.
+Pegboard installs the skills inside APM packages (directories with
+`SKILL.md`); instructions, prompts, agents, and hooks stay with `apm`.
+
+### 4.4 Hidden Unicode
+
+Instructions an agent reads can carry text a human reviewer does not see.
+Before a skill is placed, the `plan` scans its files:
+
+- **Critical** (bidirectional overrides and isolates U+202A–202E and
+  U+2066–2069, Unicode tags U+E0000–E007F, the variation selector supplement
+  U+E0100–E01EF): the skill becomes a `!` conflict. `--force` does not
+  override it; `--allow-hidden-unicode` does.
+- **Warning** (zero-width space, non-joiner and marks, word joiner and
+  invisible operators, a BOM after the first byte, soft hyphen): a `⚠` line
+  in the plan. A zero-width joiner between two emoji is not reported.
+
+`pegboard audit` runs the same scan over every skill the agents can read
+(whether pegboard placed it or not), the skills the stack declares, and the
+context files. `--exit-code` exits with 2 on critical findings; `--strict`
+counts warnings too.
+
+### 4.5 SBOM
+
+`pegboard lock export --format cyclonedx|spdx` prints the lock as a
+CycloneDX 1.5 or SPDX 2.3 JSON document: each git skill and included stack
+with its source, commit, SHA-256, and a `pkg:github/…` purl when it applies.
+It is an inventory, not a compliance attestation: local skills are not in the
+lock, and the packages MCP servers run are not resolved.
+
+### 4.6 CI
+
+The repository root is a GitHub Action:
+
+```yaml
+- uses: rmandevs/pegboard@v0.2.0
+  with:
+    command: drift        # or plan, or audit
+    args: --scope project
+```
+
+It installs the release with `install.sh` (checksum verified) and runs
+`pegboard <command> --exit-code`, failing the job on exit code 2.
+
 ---
 
 ## 5. Providers (agents)
@@ -452,6 +537,7 @@ point, not truth.
 | OpenClaw | `openclaw` · `~/.openclaw` (`OPENCLAW_STATE_DIR`, `OPENCLAW_CONFIG_PATH`) | `~/.openclaw/openclaw.json` (`mcp.servers`, JSON5); no project scope | `<state-dir>/skills/` | workspace `AGENTS.md` |
 | Cursor | `cursor` or `cursor-agent` · `~/.cursor` | `~/.cursor/mcp.json` / `.cursor/mcp.json` (`mcpServers`) | `~/.cursor/skills/` / `.cursor/skills/` | project `AGENTS.md` |
 | Gemini CLI | `gemini` · `~/.gemini` (`GEMINI_CLI_HOME`) | `~/.gemini/settings.json` / `.gemini/settings.json` (`mcpServers`) | `~/.gemini/skills/` / `.gemini/skills/` | `GEMINI.md` |
+| GitHub Copilot CLI | `copilot` · `~/.copilot` | `~/.copilot/mcp-config.json` (`mcpServers`, `type: local\|http`, `tools: ["*"]`) / none | `~/.copilot/skills/` / `.github/skills/` | project `AGENTS.md` |
 
 Skills directories follow the `npx skills` agent table (`docs/agents.md` from
 vercel-labs/skills 1.7.3). In a project, Codex and opencode share
@@ -464,14 +550,17 @@ To verify against each real agent: `opencode.jsonc` (today only
 `env_http_headers` keys; whether Hermes interpolates variables in
 `config.yaml` (today it is assumed not to); OMP's profile layout; OpenClaw's
 JSON5 config (pegboard rewrites only the `mcp` block); Cursor's required
-`type: "stdio"`; and Gemini's `httpUrl` vs `url` transports.
+`type: "stdio"`; Gemini's `httpUrl` vs `url` transports; and Copilot CLI's
+config directory override, its `${VAR}` expansion in `mcp-config.json`, and
+whether it reads a project MCP file.
 
 Hermes and OpenClaw have no known project scope: only `global` (Hermes also
 per profile, as the `hermes:<profile>` sub-target).
 
 ### Later
 
-Kiro, GitHub Copilot CLI, Windsurf, Cline, Zed, Amp… one at a time, on demand. The
+Kiro, VS Code (`.vscode/mcp.json`), Windsurf, Cline, Zed, Amp… one at a time,
+on demand. The
 competition is on correctness, not on the number of agents.
 
 ### Skills: how they are installed
@@ -607,8 +696,8 @@ and `drift` tools for agents that prefer tools over a shell.
 - **Tests:** golden files per provider with real configs (including "dirty"
   configs with unmanaged content that must not be touched). No test writes
   outside a `t.TempDir()`.
-- **Distribution:** GitHub Releases with goreleaser, Homebrew tap, `go
-  install`.
+- **Distribution:** GitHub Releases with goreleaser, `install.sh`, `go
+  install`, and the GitHub Action. Planned: Homebrew tap, Scoop bucket, WinGet.
 - **Tapioca** consumes it as a binary: its `apply_stack` and `check_drift`
   tools become calls to `pegboard --json`.
 
@@ -643,17 +732,21 @@ Linux, macOS, and Windows binaries). Phases 3 and 4 come later.
 - **Done when:** I ask an agent "add X to all of them" and it does it with
   `pegboard` without mistakes.
 
-### Phase 3 — Included stacks and policies
-- `include` of local, git, and zip stacks with a lock (§3.5); `policy.allow_mcps`.
+### Phase 3 — Included stacks and policies (in progress)
+- ✅ `include` of local, git, and zip stacks with a lock (§3.5), approval of
+  MCPs from remote stacks, and accumulated policies (`allow_mcps`,
+  `allow_skill_sources`). v0.2.0.
+- ✅ Hidden-Unicode scanning and `pegboard audit` (§4.4); `lock export` (§4.5).
+- ✅ `--exit-code` for CI and a GitHub Action (§4.6).
 - `op://` and `keychain:` secrets.
-- `--exit-code` for CI and a GitHub Action example.
+- `pegboard install <stack>` (ad-hoc remote stacks).
 - **Done when:** I share a stack in a repo and another machine ends up the
   same with one `pegboard apply`.
 
 ### Phase 4 — TUI and extras
 - TUI (Bubble Tea): view targets, review the plan, apply.
 - `pegboard mcp` (pegboard's own MCP server).
-- More providers based on use (Kiro, GitHub Copilot CLI, Windsurf, Cline, Zed, Amp…).
+- More providers based on use (Kiro, VS Code, Windsurf, Cline, Zed, Amp…).
 
 ### Later (no commitment)
 - Light UI (or Tapioca's as the first client).

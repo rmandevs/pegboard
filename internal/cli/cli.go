@@ -93,6 +93,7 @@ func newRoot(stdin io.Reader, stdout, stderr io.Writer, newEnv EnvFunc) *cobra.C
 		newUpdateCmd(opts, newEnv),
 		newSkillCmd(opts, newEnv),
 		newAuditCmd(opts, newEnv),
+		newLockCmd(opts, newEnv),
 	)
 	return root
 }

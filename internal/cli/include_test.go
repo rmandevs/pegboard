@@ -213,3 +213,51 @@ dependencies:
 	mustContain(t, "skipped", errOut, "skipped: mcp io.github.github/github-mcp-server")
 	mustContain(t, "yaml", read(t, m, "proj/pegboard.yaml"), "url: https://mcp.slack.com/mcp", "- ./packages/mine")
 }
+
+func TestLockExport(t *testing.T) {
+	commit := gitHub(t)
+	commit("acme/skills", acmeV1)
+	commit("acme/stacks", map[string]string{"web/pegboard.yaml": "version: 1\n"})
+	m := fleet(t)
+	m.File("home/.config/pegboard/pegboard.yaml", "version: 1\ninclude: [acme/stacks//web]\nskills:\n  - acme/skills@tdd\n")
+	mustRun(t, m, 0, "apply", "-y", "--agent", "claude-code")
+
+	var cdx struct {
+		BomFormat, SpecVersion string
+		Components             []struct {
+			Name, Group, Version, Purl string
+			Hashes                     []struct{ Alg, Content string }
+		}
+	}
+	if err := json.Unmarshal([]byte(mustRun(t, m, 0, "lock", "export", "--scope", "global")), &cdx); err != nil {
+		t.Fatal(err)
+	}
+	if cdx.BomFormat != "CycloneDX" || len(cdx.Components) != 2 {
+		t.Fatalf("%+v", cdx)
+	}
+	sk := cdx.Components[0]
+	if sk.Name != "tdd" || sk.Group != "skill" || len(sk.Version) != 40 || len(sk.Hashes) != 1 || len(sk.Hashes[0].Content) != 64 {
+		t.Errorf("skill: %+v", sk)
+	}
+	if cdx.Components[1].Group != "include" {
+		t.Errorf("include: %+v", cdx.Components[1])
+	}
+
+	var spdx struct {
+		SpdxVersion string
+		Packages    []struct {
+			SPDXID, Name, DownloadLocation string
+		}
+		Relationships []map[string]string
+	}
+	if err := json.Unmarshal([]byte(mustRun(t, m, 0, "lock", "export", "--format", "spdx", "--scope", "global")), &spdx); err != nil {
+		t.Fatal(err)
+	}
+	if spdx.SpdxVersion != "SPDX-2.3" || len(spdx.Packages) != 2 || len(spdx.Relationships) != 2 ||
+		!strings.HasPrefix(spdx.Packages[0].DownloadLocation, "git+") {
+		t.Fatalf("%+v", spdx)
+	}
+	if _, _, code := run(m, "lock", "export", "--format", "xml"); code != 1 {
+		t.Error("an unknown format should fail")
+	}
+}
