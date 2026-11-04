@@ -1,6 +1,8 @@
 package skills
 
 import (
+	"archive/zip"
+	"bytes"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -241,5 +243,34 @@ func TestResolveLocalAndBuiltin(t *testing.T) {
 	got, err = r.Resolve(b)
 	if err != nil || len(got) != 1 || got[0].Name != "pegboard" || got[0].Local {
 		t.Fatalf("%+v %v", got, err)
+	}
+}
+
+func TestUnzipRejectsEscapes(t *testing.T) {
+	for _, name := range []string{"../evil", "a/../../evil", "/etc/evil", "..\\evil", "C:/evil", "a/..", "ok/../../x"} {
+		var buf bytes.Buffer
+		zw := zip.NewWriter(&buf)
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _ = w.Write([]byte("x"))
+		_ = zw.Close()
+		dst := t.TempDir()
+		if err := Unzip(buf.Bytes(), filepath.Join(dst, "out")); err == nil || !strings.Contains(err.Error(), "escapes") {
+			t.Errorf("%q: err = %v", name, err)
+		}
+	}
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	w, _ := zw.Create("stack/pegboard.yaml")
+	_, _ = w.Write([]byte("version: 1\n"))
+	_ = zw.Close()
+	dst := filepath.Join(t.TempDir(), "out")
+	if err := Unzip(buf.Bytes(), dst); err != nil {
+		t.Fatal(err)
+	}
+	if root, err := zipRoot(dst); err != nil || filepath.Base(root) != "stack" {
+		t.Fatalf("root %q, %v", root, err)
 	}
 }

@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -351,18 +350,20 @@ func Unzip(data []byte, dst string) error {
 		return fmt.Errorf("the zip has more than %d entries", maxEntries)
 	}
 	var total int64
+	root := filepath.Clean(dst) + string(os.PathSeparator)
 	for _, f := range zr.File {
-		name := strings.ReplaceAll(f.Name, "\\", "/")
-		if escapes(name) {
+		// Reject any name with "..", a drive, or a leading slash outright
+		// (also names like "a..b": a stack has no reason to use them), then
+		// check the joined path is still under dst.
+		if strings.Contains(f.Name, "..") || escapes(strings.ReplaceAll(f.Name, "\\", "/")) {
 			return fmt.Errorf("entry %q escapes the destination", f.Name)
 		}
-		clean := path.Clean("/" + name)
 		if f.Mode()&os.ModeSymlink != 0 {
-			return fmt.Errorf("entry %q is a symlink", name)
+			return fmt.Errorf("entry %q is a symlink", f.Name)
 		}
-		target := filepath.Join(dst, filepath.FromSlash(strings.TrimPrefix(clean, "/")))
-		if rel, err := filepath.Rel(dst, target); err != nil || strings.HasPrefix(rel, "..") {
-			return fmt.Errorf("entry %q escapes the destination", name)
+		target := filepath.Join(dst, filepath.FromSlash(strings.ReplaceAll(f.Name, "\\", "/")))
+		if !strings.HasPrefix(target+string(os.PathSeparator), root) {
+			return fmt.Errorf("entry %q escapes the destination", f.Name)
 		}
 		if f.FileInfo().IsDir() {
 			if err := os.MkdirAll(target, 0o755); err != nil {
@@ -399,7 +400,7 @@ func Unzip(data []byte, dst string) error {
 			return err
 		}
 		if n > int64(f.UncompressedSize64) {
-			return fmt.Errorf("entry %q is larger than it declares", name)
+			return fmt.Errorf("entry %q is larger than it declares", f.Name)
 		}
 	}
 	return nil
