@@ -24,6 +24,10 @@
 
 ---
 
+<p align="center">
+  <a href="https://usepegboard.dev"><img src="assets/pegboard-demo.gif" alt="Pegboard demo: declare your tools once and apply them to every agent" width="720"></a>
+</p>
+
 Every coding agent stores its MCPs and skills in a different place and format, so keeping them in sync means translating by hand. Pegboard does that translation with `plan`, `apply`, and `drift`, like Ansible and Terraform do for servers.
 
 Like a workshop pegboard, every tool has its silhouette, and at a glance you see what's missing.
